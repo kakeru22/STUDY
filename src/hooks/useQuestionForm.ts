@@ -3,16 +3,17 @@ import {
   BINARY_CHOICES,
   createEmptyMultipleChoices,
   createInitialQuestionDraft,
+  normalizeQuestionDraft,
   type QuestionDraft,
   type QuestionType
 } from "../types/question";
 
 type ValidationErrors = Partial<Record<keyof QuestionDraft | "choices", string>>;
 
-type SubmitResult = { ok: true; value: QuestionDraft } | { ok: false };
+type SubmitResult = { ok: true; value: QuestionDraft } | { ok: false; errors: ValidationErrors };
 
 export function useQuestionForm(initialValue?: QuestionDraft) {
-  const [draft, setDraft] = useState<QuestionDraft>(initialValue ?? createInitialQuestionDraft());
+  const [draft, setDraft] = useState<QuestionDraft>(normalizeQuestionDraft(initialValue ?? createInitialQuestionDraft()));
   const [tagInput, setTagInput] = useState("");
   const [errors, setErrors] = useState<ValidationErrors>({});
 
@@ -123,7 +124,7 @@ export function useQuestionForm(initialValue?: QuestionDraft) {
     setErrors(nextErrors);
 
     if (Object.keys(nextErrors).length > 0) {
-      return { ok: false };
+      return { ok: false, errors: nextErrors };
     }
 
     return {
@@ -139,7 +140,7 @@ export function useQuestionForm(initialValue?: QuestionDraft) {
   }
 
   function reset(nextDraft = createInitialQuestionDraft()) {
-    setDraft(nextDraft);
+    setDraft(normalizeQuestionDraft(nextDraft));
     setTagInput("");
     setErrors({});
   }

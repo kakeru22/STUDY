@@ -1,6 +1,6 @@
-import type { FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { useQuestionForm } from "../../hooks/useQuestionForm";
-import { createInitialQuestionDraft, type QuestionDraft } from "../../types/question";
+import { createInitialQuestionDraft, type QuestionDraft, type QuestionImage } from "../../types/question";
 
 type QuestionFormProps = {
   mode: "create" | "edit";
@@ -12,7 +12,50 @@ type QuestionFormProps = {
 
 const suggestedTags = ["英語", "単語", "基礎", "日本史", "鎌倉"];
 
+const MAX_IMAGE_COUNT = 6;
+const MAX_IMAGE_WIDTH = 1600;
+const JPEG_QUALITY = 0.82;
+
+async function fileToCompressedDataUrl(file: File) {
+  const originalDataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(typeof reader.result === "string" ? reader.result : "");
+    reader.onerror = () => reject(new Error("画像の読み込みに失敗しました。"));
+    reader.readAsDataURL(file);
+  });
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error("画像の展開に失敗しました。"));
+    element.src = originalDataUrl;
+  });
+
+  const width = image.naturalWidth;
+  const height = image.naturalHeight;
+  const scale = Math.min(1, MAX_IMAGE_WIDTH / Math.max(width, height));
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("画像圧縮の初期化に失敗しました。");
+  }
+
+  context.drawImage(image, 0, 0, targetWidth, targetHeight);
+  return canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+}
+
 export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, onSaveDraft }: QuestionFormProps) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [notice, setNotice] = useState<{
+    type: "error";
+    title: string;
+    messages: string[];
+  } | null>(null);
   const {
     draft,
     tagInput,
@@ -30,6 +73,57 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
     reset
   } = useQuestionForm(initialValue);
 
+  useEffect(() => {
+    if (!notice) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    try {
+      const remaining = Math.max(0, MAX_IMAGE_COUNT - draft.images.length);
+      const targets = files.slice(0, remaining);
+
+      if (targets.length === 0) {
+        setNotice({
+          type: "error",
+          title: "画像を追加できません",
+          messages: [`画像は最大${MAX_IMAGE_COUNT}枚までです。`]
+        });
+        event.target.value = "";
+        return;
+      }
+
+      const compressed = await Promise.all(
+        targets.map(async (file, index) => {
+          const dataUrl = await fileToCompressedDataUrl(file);
+          return {
+            id: `${Date.now()}-${index}`,
+            dataUrl
+          } satisfies QuestionImage;
+        })
+      );
+      setField("images", [...draft.images, ...compressed]);
+      setField("imageDataUrl", null);
+      setNotice(null);
+    } catch (error) {
+      setNotice({
+        type: "error",
+        title: "画像の追加に失敗しました",
+        messages: [error instanceof Error ? error.message : "画像処理でエラーが発生しました。"]
+      });
+    }
+    event.target.value = "";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     await submitWith(onSubmit);
@@ -39,10 +133,16 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
     const result = submit();
 
     if (!result.ok) {
+      setNotice({
+        type: "error",
+        title: "入力内容を確認してください",
+        messages: Object.values(result.errors).filter((value): value is string => Boolean(value))
+      });
       return;
     }
 
     await callback(result.value);
+    setNotice(null);
 
     if (mode === "create") {
       const nextDraft = createInitialQuestionDraft();
@@ -64,6 +164,22 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
 
   return (
     <form className="panel form-layout" onSubmit={handleSubmit}>
+      {notice ? (
+        <div className={`form-toast form-toast--${notice.type}`} role="alert" aria-live="assertive">
+          <div className="form-toast__content">
+            <strong>{notice.title}</strong>
+            <ul className="form-toast__list">
+              {notice.messages.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" className="form-toast__close" onClick={() => setNotice(null)} aria-label="通知を閉じる">
+            ×
+          </button>
+        </div>
+      ) : null}
+
       <div className="toggle-row">
         <button
           type="button"
@@ -102,6 +218,49 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
         />
         {errors.questionText ? <small className="field-error">{errors.questionText}</small> : null}
       </label>
+
+      <div className="field">
+        <span>画像</span>
+        <div className="image-upload-panel">
+          {draft.images.length > 0 ? (
+            <div className="image-upload-grid">
+              {draft.images.map((image, index) => (
+                <div key={image.id} className="image-upload-preview">
+                  <img src={image.dataUrl} alt={`問題画像プレビュー ${index + 1}`} className="question-image" />
+                  <button
+                    type="button"
+                    className="image-remove-button"
+                    onClick={() => setField("images", draft.images.filter((item) => item.id !== image.id))}
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="image-upload-placeholder">画像なし</div>
+          )}
+          <div className="image-upload-actions">
+            <button type="button" className="button-secondary" onClick={() => fileInputRef.current?.click()}>
+              画像を選択
+            </button>
+            {draft.images.length > 0 ? (
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => {
+                  setField("images", []);
+                  setField("imageDataUrl", null);
+                }}
+              >
+                すべて削除
+              </button>
+            ) : null}
+            <small>{draft.images.length} / {MAX_IMAGE_COUNT}枚</small>
+          </div>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={handleImageChange} />
+        </div>
+      </div>
 
       <div className="choice-panel field">
         <div className="choice-panel__header">

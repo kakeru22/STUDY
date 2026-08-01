@@ -9,6 +9,8 @@ const questions: QuestionRecord[] = [
     type: "binary",
     category: "英語基礎",
     questionText: "apple は「りんご」である。",
+    images: [],
+    imageDataUrl: null,
     choices: [
       { id: "a", label: "〇" },
       { id: "b", label: "×" }
@@ -27,6 +29,8 @@ const questions: QuestionRecord[] = [
     type: "multiple",
     category: "日本史",
     questionText: "鎌倉幕府の成立年として最も一般的に扱われるものを選べ。",
+    images: [],
+    imageDataUrl: null,
     choices: [
       { id: "a", label: "1180年" },
       { id: "b", label: "1185年" },
@@ -86,4 +90,3 @@ export const seedState: PersistedState = {
     statusMessage: "ローカルモードで起動中"
   }
 };
-

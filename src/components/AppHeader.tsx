@@ -9,7 +9,7 @@ export function AppHeader({ title, rightSlot }: AppHeaderProps) {
   return (
     <header className="app-header">
       <div>
-        <p className="eyebrow">Personal Study</p>
+        <p className="eyebrow">Study</p>
         <h1>{title}</h1>
       </div>
       {rightSlot}

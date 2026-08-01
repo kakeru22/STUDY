@@ -33,12 +33,18 @@ export function SettingsPage() {
 
   return (
     <section className="page">
-      <div className="page-heading">
-        <p className="eyebrow">Sync & Settings</p>
-        <h2>同期 / 設定</h2>
+      <div className="page-heading page-heading--split">
+        <div>
+          <p className="eyebrow">Sync & Settings</p>
+          <h2>同期 / 設定</h2>
+        </div>
+        <div className="page-heading__meta">
+          <span>Sync</span>
+          <strong>{state.sync.mode}</strong>
+        </div>
       </div>
 
-      <div className="panel settings-list">
+      <div className="panel settings-list settings-shell">
         <div className="field">
           <p className="section-title">Google Drive</p>
           <label className="field">
@@ -59,12 +65,23 @@ export function SettingsPage() {
             onChange={(event) => updateSettings({ driveFolderName: event.target.value })}
           />
         </div>
-        <div>
+        <div className="settings-status">
           <p className="section-title">同期状態</p>
-          <p>状態: {state.sync.mode}</p>
-          <p>未同期の変更: {state.sync.unsyncedCount}件</p>
-          <p>最終同期: {state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleString("ja-JP") : "未同期"}</p>
-          <p>{busyMessage || state.sync.statusMessage}</p>
+          <div className="mini-stat-grid">
+            <div className="mini-stat">
+              <span>状態</span>
+              <strong>{state.sync.mode}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>未同期</span>
+              <strong>{state.sync.unsyncedCount}</strong>
+            </div>
+            <div className="mini-stat mini-stat--wide">
+              <span>最終同期</span>
+              <strong>{state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleString("ja-JP") : "未同期"}</strong>
+            </div>
+          </div>
+          <p className="settings-status__message">{busyMessage || state.sync.statusMessage}</p>
         </div>
         <div className="action-stack">
           <button
@@ -124,8 +141,11 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel">
-        <p className="section-title">用意が必要なもの</p>
+      <div className="panel page-side-panel">
+        <div className="page-side-panel__heading">
+          <p className="section-title">Setup</p>
+          <strong>用意が必要なもの</strong>
+        </div>
         <ul className="plain-list">
           <li>Googleアカウント</li>
           <li>Google Cloud プロジェクト</li>

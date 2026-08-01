@@ -41,29 +41,42 @@ export function QuestionEditPage() {
 
   return (
     <section className="page">
-      <div className="page-heading">
-        <p className="eyebrow">Question Edit</p>
-        <h2>問題編集</h2>
+      <div className="page-heading page-heading--split">
+        <div>
+          <p className="eyebrow">Question Edit</p>
+          <h2>問題編集</h2>
+        </div>
+        <div className="page-heading__meta">
+          <span>Question</span>
+          <strong>{currentQuestion.category}</strong>
+        </div>
       </div>
 
       <QuestionForm mode="edit" initialValue={currentQuestion} onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} />
 
-      <aside className="panel save-preview">
-        <p className="section-title">学習状況</p>
-        <p>{message || "内容を更新しながら、この問題の学習状況を確認できます。"}</p>
-        <div className="save-preview__details">
-          <p>
-            <strong>正解:</strong> {progress?.correctCount ?? 0}
-          </p>
-          <p>
-            <strong>不正解:</strong> {progress?.wrongCount ?? 0}
-          </p>
-          <p>
-            <strong>連続正解:</strong> {progress?.correctStreak ?? 0}
-          </p>
-          <p>
-            <strong>次回復習:</strong> {progress?.nextReviewAt ? new Date(progress.nextReviewAt).toLocaleString("ja-JP") : "未設定"}
-          </p>
+      <aside className="panel save-preview page-side-panel">
+        <div className="page-side-panel__heading">
+          <p className="section-title">Progress</p>
+          <strong>学習状況</strong>
+        </div>
+        <p className="page-side-panel__lead">{message || "更新しながら状況を確認できます。"}</p>
+        <div className="mini-stat-grid">
+          <div className="mini-stat">
+            <span>正解</span>
+            <strong>{progress?.correctCount ?? 0}</strong>
+          </div>
+          <div className="mini-stat">
+            <span>不正解</span>
+            <strong>{progress?.wrongCount ?? 0}</strong>
+          </div>
+          <div className="mini-stat">
+            <span>連続</span>
+            <strong>{progress?.correctStreak ?? 0}</strong>
+          </div>
+          <div className="mini-stat">
+            <span>次回</span>
+            <strong>{progress?.nextReviewAt ? new Date(progress.nextReviewAt).toLocaleDateString("ja-JP") : "未設定"}</strong>
+          </div>
         </div>
         <div className="action-stack">
           <button type="button" className="button-secondary" onClick={() => navigate("/questions")}>

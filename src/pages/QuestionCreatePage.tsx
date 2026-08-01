@@ -28,30 +28,43 @@ export function QuestionCreatePage() {
 
   return (
     <section className="page">
-      <div className="page-heading">
-        <p className="eyebrow">Question Form</p>
-        <h2>問題追加</h2>
+      <div className="page-heading page-heading--split">
+        <div>
+          <p className="eyebrow">Question Form</p>
+          <h2>問題追加</h2>
+        </div>
+        <div className="page-heading__meta">
+          <span>Local Save</span>
+          <strong>{lastSaved ? "保存済み" : "編集中"}</strong>
+        </div>
       </div>
 
       <QuestionForm mode="create" onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} onSaveDraft={handleSaveDraft} />
 
-      <aside className="panel save-preview">
-        <p className="section-title">保存状態</p>
-        <p>{message}</p>
+      <aside className="panel save-preview page-side-panel">
+        <div className="page-side-panel__heading">
+          <p className="section-title">State</p>
+          <strong>保存状態</strong>
+        </div>
+        <p className="page-side-panel__lead">{message}</p>
         {lastSaved ? (
-          <div className="save-preview__details">
-            <p>
-              <strong>形式:</strong> {lastSaved.type === "binary" ? "〇×" : "N択"}
-            </p>
-            <p>
-              <strong>カテゴリ:</strong> {lastSaved.category}
-            </p>
-            <p>
-              <strong>タグ:</strong> {lastSaved.tags.length > 0 ? lastSaved.tags.join(", ") : "なし"}
-            </p>
-            <p>
-              <strong>正解:</strong> {lastSaved.correctChoiceId.toUpperCase()}
-            </p>
+          <div className="mini-stat-grid">
+            <div className="mini-stat">
+              <span>形式</span>
+              <strong>{lastSaved.type === "binary" ? "〇×" : "N択"}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>タグ</span>
+              <strong>{lastSaved.tags.length || 0}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>カテゴリ</span>
+              <strong>{lastSaved.category}</strong>
+            </div>
+            <div className="mini-stat">
+              <span>正解</span>
+              <strong>{lastSaved.correctChoiceId.toUpperCase()}</strong>
+            </div>
           </div>
         ) : null}
         <div className="action-stack">
