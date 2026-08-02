@@ -216,6 +216,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
+  const autoReconnectAttemptedRef = useRef(false);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -336,6 +337,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
     });
   }, []);
+
+  useEffect(() => {
+    if (!state.isHydrated || autoReconnectAttemptedRef.current) {
+      return;
+    }
+
+    const shouldReconnect =
+      state.settings.startupMode === "drive" &&
+      isOnline &&
+      !state.sync.isAuthorized &&
+      state.settings.googleClientId.trim().length > 0;
+
+    if (!shouldReconnect) {
+      return;
+    }
+
+    autoReconnectAttemptedRef.current = true;
+    dispatch({
+      type: "set-sync",
+      payload: {
+        mode: "syncing",
+        statusMessage: "Google Drive に再接続しています。"
+      }
+    });
+
+    void requestDriveAccessToken(state.settings.googleClientId, "")
+      .then(() => {
+        dispatch({
+          type: "set-sync",
+          payload: {
+            mode: "online",
+            isAuthorized: true,
+            statusMessage: ""
+          }
+        });
+      })
+      .catch(() => {
+        dispatch({
+          type: "set-sync",
+          payload: {
+            mode: "offline",
+            isAuthorized: false,
+            statusMessage: "Google Drive に再接続できませんでした。"
+          }
+        });
+      });
+  }, [isOnline, state.isHydrated, state.settings.googleClientId, state.settings.startupMode, state.sync.isAuthorized]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);

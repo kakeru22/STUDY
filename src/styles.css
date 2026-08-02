@@ -449,9 +449,13 @@ select {
 }
 
 .welcome-copy h2 {
-  font-size: clamp(2rem, 5vw, 3rem);
-  line-height: 1.05;
+  font-family: "Sora", "Inter", sans-serif;
+  font-size: clamp(1.84rem, 4.6vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
   max-width: 11ch;
+  color: var(--accent-strong);
 }
 
 .welcome-copy p:last-child {

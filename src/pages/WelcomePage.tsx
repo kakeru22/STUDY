@@ -39,8 +39,8 @@ export function WelcomePage() {
     <section className="page welcome-page">
       <div className="welcome-shell panel">
         <div className="welcome-copy">
-          <h2>使い方を選ぶ</h2>
-          <p>Google Drive と同期して使うか、この端末だけで使うかを選べます。</p>
+          <h2>再ログイン</h2>
+          <p>Google Drive ともう一度つなぐか、この端末だけで続けるかを選べます。</p>
         </div>
 
         <div className="welcome-options">
@@ -48,16 +48,16 @@ export function WelcomePage() {
             <span className="welcome-option__icon-wrap">
               <AppIcon name="drive" className="welcome-option__icon" />
             </span>
-            <strong>Google Drive と使う</strong>
-            <span>自動で同期します</span>
+            <strong>Google Drive とつなぐ</strong>
+            <span>自動同期を再開</span>
           </button>
 
           <button type="button" className="welcome-option" onClick={handleOfflineStart}>
             <span className="welcome-option__icon-wrap">
               <AppIcon name="offline" className="welcome-option__icon" />
             </span>
-            <strong>この端末だけで使う</strong>
-            <span>通信なしでも使えます</span>
+            <strong>この端末だけで続ける</strong>
+            <span>オフラインで使う</span>
           </button>
         </div>
 
@@ -67,7 +67,7 @@ export function WelcomePage() {
             <strong>{statusLabel}</strong>
           </div>
           <div className="welcome-meta__item">
-            <span>同期モード</span>
+            <span>いまの状態</span>
             <strong>{state.sync.mode === "offline" ? "オフライン" : "オンライン"}</strong>
           </div>
         </div>

@@ -101,6 +101,10 @@ export function AppRoutes() {
     return <LoadingShell />;
   }
 
+  if (state.settings.startupMode === "drive" && !state.sync.isAuthorized && state.sync.mode === "syncing") {
+    return <LoadingShell />;
+  }
+
   if ((!state.settings.googleClientId.trim() || !state.sync.isAuthorized) && state.settings.startupMode !== "offline") {
     return <WelcomeShell />;
   }

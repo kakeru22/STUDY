@@ -75,7 +75,7 @@ function waitForGoogle(): Promise<void> {
   });
 }
 
-export async function requestDriveAccessToken(clientId: string): Promise<string> {
+export async function requestDriveAccessToken(clientId: string, prompt: "" | "consent" = "consent"): Promise<string> {
   if (!clientId.trim()) {
     throw new Error("Google Client ID が未設定です。");
   }
@@ -97,7 +97,7 @@ export async function requestDriveAccessToken(clientId: string): Promise<string>
       }
     });
 
-    tokenClient.requestAccessToken({ prompt: session.accessToken ? "" : "consent" });
+    tokenClient.requestAccessToken({ prompt: session.accessToken ? "" : prompt });
   });
 }
 
