@@ -1,4 +1,5 @@
 import { useRef, useState, type ChangeEvent } from "react";
+import { GoogleClientIdHelpModal } from "../components/GoogleClientIdHelpModal";
 import { useAppContext } from "../contexts/AppContext";
 import type { PersistedState } from "../types/app";
 
@@ -7,6 +8,7 @@ export function SettingsPage() {
     useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [busyMessage, setBusyMessage] = useState("");
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   function downloadBackup() {
     const snapshot = exportSnapshot();
@@ -44,117 +46,120 @@ export function SettingsPage() {
         </div>
       </div>
 
-      <div className="panel settings-list settings-shell">
-        <div className="field">
-          <p className="section-title">Google Drive</p>
-          <label className="field">
-            <span>Google OAuth Client ID</span>
+      <div className="page-shell">
+        <div className="panel settings-list settings-shell">
+          <div className="field">
+            <p className="section-title">Google Drive</p>
+            <label className="field">
+              <span className="field-label-with-action">
+                <span>Google OAuth Client ID</span>
+                <button type="button" className="help-trigger" onClick={() => setIsHelpOpen(true)} aria-label="設定方法を開く">
+                  ?
+                </button>
+              </span>
+              <input
+                type="text"
+                value={state.settings.googleClientId}
+                onChange={(event) => updateSettings({ googleClientId: event.target.value })}
+                placeholder="Netlify 用に発行した Web client ID"
+              />
+            </label>
+          </div>
+
+          <div className="field">
+            <p className="section-title">Drive フォルダ名</p>
             <input
               type="text"
-              value={state.settings.googleClientId}
-              onChange={(event) => updateSettings({ googleClientId: event.target.value })}
-              placeholder="Google Cloud で発行した Web client ID"
+              value={state.settings.driveFolderName}
+              onChange={(event) => updateSettings({ driveFolderName: event.target.value })}
             />
-          </label>
-        </div>
-        <div className="field">
-          <p className="section-title">Driveフォルダ</p>
-          <input
-            type="text"
-            value={state.settings.driveFolderName}
-            onChange={(event) => updateSettings({ driveFolderName: event.target.value })}
-          />
-        </div>
-        <div className="settings-status">
-          <p className="section-title">同期状態</p>
-          <div className="mini-stat-grid">
-            <div className="mini-stat">
-              <span>状態</span>
-              <strong>{state.sync.mode}</strong>
-            </div>
-            <div className="mini-stat">
-              <span>未同期</span>
-              <strong>{state.sync.unsyncedCount}</strong>
-            </div>
-            <div className="mini-stat mini-stat--wide">
-              <span>最終同期</span>
-              <strong>{state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleString("ja-JP") : "未同期"}</strong>
-            </div>
           </div>
-          <p className="settings-status__message">{busyMessage || state.sync.statusMessage}</p>
-        </div>
-        <div className="action-stack">
-          <button
-            type="button"
-            onClick={async () => {
-              setBusyMessage("Google認証中...");
-              try {
-                await authorizeGoogleDrive();
-                setBusyMessage("Google Drive を認証しました。");
-              } catch (error) {
-                setBusyMessage(error instanceof Error ? error.message : "Google認証に失敗しました。");
-              }
-            }}
-          >
-            Googleに接続
-          </button>
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={async () => {
-              setBusyMessage("Driveへ同期中...");
-              try {
-                await syncToDrive();
-                setBusyMessage("Driveへ同期しました。");
-              } catch (error) {
-                setBusyMessage(error instanceof Error ? error.message : "Drive同期に失敗しました。");
-              }
-            }}
-          >
-            今すぐ同期
-          </button>
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={async () => {
-              setBusyMessage("Driveから読込中...");
-              try {
-                await loadFromDrive();
-                setBusyMessage("Driveから読み込みました。");
-              } catch (error) {
-                setBusyMessage(error instanceof Error ? error.message : "Drive読込に失敗しました。");
-              }
-            }}
-          >
-            Driveから再読込
-          </button>
-          <button type="button" className="button-secondary" onClick={downloadBackup}>
-            バックアップを書き出す
-          </button>
-          <button type="button" className="button-secondary" onClick={() => fileInputRef.current?.click()}>
-            バックアップを読込
-          </button>
-          <button type="button" className="button-secondary" onClick={signOutDrive}>
-            Drive連携を解除
-          </button>
-          <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={handleFileImport} />
+
+          <div className="settings-status">
+            <p className="section-title">同期状態</p>
+            <div className="mini-stat-grid">
+              <div className="mini-stat">
+                <span>状態</span>
+                <strong>{state.sync.mode}</strong>
+              </div>
+              <div className="mini-stat">
+                <span>未同期</span>
+                <strong>{state.sync.unsyncedCount}</strong>
+              </div>
+              <div className="mini-stat mini-stat--wide">
+                <span>最終同期</span>
+                <strong>{state.sync.lastSyncedAt ? new Date(state.sync.lastSyncedAt).toLocaleString("ja-JP") : "未同期"}</strong>
+              </div>
+            </div>
+            <p className="settings-status__message">{busyMessage || state.sync.statusMessage}</p>
+          </div>
+
+          <div className="action-stack">
+            <button
+              type="button"
+              onClick={async () => {
+                setBusyMessage("Google に接続中...");
+                try {
+                  await authorizeGoogleDrive();
+                  setBusyMessage("Google Drive を認証しました。");
+                } catch (error) {
+                  setBusyMessage(error instanceof Error ? error.message : "Google 認証に失敗しました。");
+                }
+              }}
+            >
+              Google に接続
+            </button>
+
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={async () => {
+                setBusyMessage("Drive に同期中...");
+                try {
+                  await syncToDrive();
+                  setBusyMessage("Drive に同期しました。");
+                } catch (error) {
+                  setBusyMessage(error instanceof Error ? error.message : "Drive 同期に失敗しました。");
+                }
+              }}
+            >
+              今すぐ同期
+            </button>
+
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={async () => {
+                setBusyMessage("Drive から読み込み中...");
+                try {
+                  await loadFromDrive();
+                  setBusyMessage("Drive から読み込みました。");
+                } catch (error) {
+                  setBusyMessage(error instanceof Error ? error.message : "Drive 読み込みに失敗しました。");
+                }
+              }}
+            >
+              Drive から読み込む
+            </button>
+
+            <button type="button" className="button-secondary" onClick={downloadBackup}>
+              バックアップを書き出す
+            </button>
+
+            <button type="button" className="button-secondary" onClick={() => fileInputRef.current?.click()}>
+              バックアップを読み込む
+            </button>
+
+            <button type="button" className="button-secondary" onClick={signOutDrive}>
+              Drive 連携を解除
+            </button>
+
+            <input ref={fileInputRef} type="file" accept="application/json" hidden onChange={handleFileImport} />
+          </div>
         </div>
       </div>
 
-      <div className="panel page-side-panel">
-        <div className="page-side-panel__heading">
-          <p className="section-title">Setup</p>
-          <strong>用意が必要なもの</strong>
-        </div>
-        <ul className="plain-list">
-          <li>Googleアカウント</li>
-          <li>Google Cloud プロジェクト</li>
-          <li>有効化した Google Drive API</li>
-          <li>OAuth 同意画面</li>
-          <li>Web アプリ用 OAuth Client ID</li>
-          <li>開発URLと本番URLの承認済みJavaScript生成元</li>
-        </ul>
-      </div>
+      <GoogleClientIdHelpModal open={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
     </section>
   );
 }

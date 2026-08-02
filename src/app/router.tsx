@@ -1,5 +1,6 @@
-import { NavLink, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
+import { AppIcon } from "../components/AppIcon";
 import { StatusBanner } from "../components/StatusBanner";
 import { SyncBadge } from "../components/SyncBadge";
 import { useAppContext } from "../contexts/AppContext";
@@ -9,37 +10,57 @@ import { QuestionEditPage } from "../pages/QuestionEditPage";
 import { QuestionListPage } from "../pages/QuestionListPage";
 import { ReviewPage } from "../pages/ReviewPage";
 import { SettingsPage } from "../pages/SettingsPage";
+import { SetupPage } from "../pages/SetupPage";
+import { WelcomePage } from "../pages/WelcomePage";
 
 const navItems = [
-  { to: "/", label: "⌂", ariaLabel: "ホーム" },
-  { to: "/create", label: "+", ariaLabel: "追加" },
-  { to: "/questions", label: "≣", ariaLabel: "一覧" },
-  { to: "/review", label: "◉", ariaLabel: "復習" },
-  { to: "/settings", label: "⚙", ariaLabel: "設定" }
-];
+  { to: "/", icon: "home", ariaLabel: "ホーム" },
+  { to: "/create", icon: "add", ariaLabel: "追加" },
+  { to: "/questions", icon: "library", ariaLabel: "一覧" },
+  { to: "/review", icon: "review", ariaLabel: "復習" },
+  { to: "/settings", icon: "settings", ariaLabel: "設定" }
+] as const;
 
-export function AppRoutes() {
+function LoadingShell() {
+  return (
+    <div className="app-shell app-shell--loading">
+      <AppHeader title="AnkiSoft" rightSlot={null} />
+      <main className="page-content">
+        <section className="panel loading-panel">
+          <p className="section-title">Loading</p>
+          <p>ローカルデータを読み込んでいます。</p>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function WelcomeShell() {
+  const { state } = useAppContext();
+  const target = state.settings.googleClientId.trim() ? "/welcome" : "/setup";
+
+  return (
+    <div className="app-shell app-shell--welcome">
+      <AppHeader title="AnkiSoft" rightSlot={null} />
+      <main className="page-content">
+        <Routes>
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="/welcome" element={<WelcomePage />} />
+          <Route path="*" element={<Navigate to={target} replace />} />
+        </Routes>
+      </main>
+    </div>
+  );
+}
+
+function MainShell() {
   const { state } = useAppContext();
   const location = useLocation();
   const isReviewFlow = location.pathname === "/review/session" || location.pathname === "/review/result";
 
-  if (!state.isHydrated) {
-    return (
-      <div className="app-shell">
-        <AppHeader title="Study Review" rightSlot={<SyncBadge state={state.sync} />} />
-        <main className="page-content">
-          <section className="panel">
-            <p className="section-title">Loading</p>
-            <p>ローカルデータを読み込んでいます。</p>
-          </section>
-        </main>
-      </div>
-    );
-  }
-
   return (
     <div className={isReviewFlow ? "app-shell app-shell--immersive" : "app-shell"}>
-      <AppHeader title="Study Review" rightSlot={<SyncBadge state={state.sync} />} />
+      <AppHeader title="AnkiSoft" rightSlot={<SyncBadge state={state.sync} />} />
       {!isReviewFlow ? <StatusBanner state={state.sync} /> : null}
       <main className="page-content">
         <Routes>
@@ -51,6 +72,8 @@ export function AppRoutes() {
           <Route path="/review/session" element={<ReviewPage />} />
           <Route path="/review/result" element={<ReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/setup" element={<Navigate to="/" replace />} />
+          <Route path="/welcome" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
       {!isReviewFlow ? (
@@ -64,11 +87,25 @@ export function AppRoutes() {
               aria-label={item.ariaLabel}
               title={item.ariaLabel}
             >
-              <span className="bottom-nav__icon" aria-hidden="true">{item.label}</span>
+              <AppIcon name={item.icon} className="bottom-nav__icon" />
             </NavLink>
           ))}
         </nav>
       ) : null}
     </div>
   );
+}
+
+export function AppRoutes() {
+  const { state } = useAppContext();
+
+  if (!state.isHydrated) {
+    return <LoadingShell />;
+  }
+
+  if ((!state.settings.googleClientId.trim() || !state.sync.isAuthorized) && state.settings.startupMode !== "offline") {
+    return <WelcomeShell />;
+  }
+
+  return <MainShell />;
 }

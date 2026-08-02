@@ -3,5 +3,5 @@ export type AppSettings = {
   googleClientId: string;
   driveFolderName: string;
   driveFolderId: string | null;
+  startupMode: "unset" | "offline" | "drive";
 };
-

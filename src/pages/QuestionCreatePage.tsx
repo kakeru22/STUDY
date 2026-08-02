@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { QuestionForm } from "../features/question-form/QuestionForm";
 import type { QuestionDraft } from "../types/question";
@@ -39,43 +40,50 @@ export function QuestionCreatePage() {
         </div>
       </div>
 
-      <QuestionForm mode="create" onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} onSaveDraft={handleSaveDraft} />
+      <div className="page-shell">
+        <QuestionForm mode="create" onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} onSaveDraft={handleSaveDraft} />
 
-      <aside className="panel save-preview page-side-panel">
-        <div className="page-side-panel__heading">
-          <p className="section-title">State</p>
-          <strong>保存状態</strong>
-        </div>
-        <p className="page-side-panel__lead">{message}</p>
-        {lastSaved ? (
-          <div className="mini-stat-grid">
-            <div className="mini-stat">
-              <span>形式</span>
-              <strong>{lastSaved.type === "binary" ? "〇×" : "N択"}</strong>
+        <aside className="page-side-column">
+          <section className="panel save-preview page-side-panel">
+            <div className="page-side-panel__heading icon-heading">
+              <span className="icon-heading__mark"><AppIcon name="check" className="inline-icon" /></span>
+              <div>
+                <p className="section-title">State</p>
+                <strong>保存状態</strong>
+              </div>
             </div>
-            <div className="mini-stat">
-              <span>タグ</span>
-              <strong>{lastSaved.tags.length || 0}</strong>
+            <p className="page-side-panel__lead">{message}</p>
+            {lastSaved ? (
+              <div className="mini-stat-grid">
+                <div className="mini-stat">
+                  <span>形式</span>
+                  <strong>{lastSaved.type === "binary" ? "〇×" : "N択"}</strong>
+                </div>
+                <div className="mini-stat">
+                  <span>タグ</span>
+                  <strong>{lastSaved.tags.length || 0}</strong>
+                </div>
+                <div className="mini-stat">
+                  <span>カテゴリ</span>
+                  <strong>{lastSaved.category}</strong>
+                </div>
+                <div className="mini-stat">
+                  <span>正解</span>
+                  <strong>{lastSaved.correctChoiceId.toUpperCase()}</strong>
+                </div>
+              </div>
+            ) : null}
+            <div className="action-stack">
+              <button type="button" className="button-secondary" onClick={() => navigate("/questions")}>
+                問題一覧へ
+              </button>
+              <button type="button" className="button-secondary" onClick={() => navigate("/settings")}>
+                設定を開く
+              </button>
             </div>
-            <div className="mini-stat">
-              <span>カテゴリ</span>
-              <strong>{lastSaved.category}</strong>
-            </div>
-            <div className="mini-stat">
-              <span>正解</span>
-              <strong>{lastSaved.correctChoiceId.toUpperCase()}</strong>
-            </div>
-          </div>
-        ) : null}
-        <div className="action-stack">
-          <button type="button" className="button-secondary" onClick={() => navigate("/questions")}>
-            問題一覧へ
-          </button>
-          <button type="button" className="button-secondary" onClick={() => navigate("/settings")}>
-            設定を開く
-          </button>
-        </div>
-      </aside>
+          </section>
+        </aside>
+      </div>
     </section>
   );
 }

@@ -31,6 +31,7 @@ type AppContextValue = {
   answerQuestion: (questionId: string, selectedChoiceId: string) => { correct: boolean; nextReviewAt: string };
   importSnapshot: (snapshot: PersistedState) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  setStartupMode: (mode: AppSettings["startupMode"]) => void;
   authorizeGoogleDrive: () => Promise<void>;
   syncToDrive: () => Promise<void>;
   loadFromDrive: () => Promise<void>;
@@ -47,7 +48,7 @@ type Action =
   | { type: "archive-question"; payload: { questionId: string } }
   | { type: "answer-question"; payload: { questionId: string; selectedChoiceId: string; answeredAt: string } }
   | { type: "replace-state"; payload: PersistedState }
-  | { type: "update-settings"; payload: Partial<AppSettings> };
+  | { type: "update-settings"; payload: Partial<AppSettings>; trackDirty?: boolean };
 
 const initialState: AppState = {
   ...seedState,
@@ -182,7 +183,7 @@ function reducer(state: AppState, action: Action): AppState {
           ...state.settings,
           ...action.payload
         },
-        sync: markDirty(state.sync, "設定を更新しました。")
+        sync: action.trackDirty === false ? state.sync : markDirty(state.sync, "設定を更新しました。")
       };
     default:
       return state;
@@ -307,10 +308,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       updateSettings(patch) {
         dispatch({ type: "update-settings", payload: patch });
       },
+      setStartupMode(mode) {
+        dispatch({ type: "update-settings", payload: { startupMode: mode }, trackDirty: false });
+      },
       async authorizeGoogleDrive() {
         dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google認証を開始します。" } });
         try {
           await requestDriveAccessToken(state.settings.googleClientId);
+          dispatch({ type: "update-settings", payload: { startupMode: "drive" }, trackDirty: false });
           dispatch({
             type: "set-sync",
             payload: {
@@ -400,6 +405,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       signOutDrive() {
         revokeDriveAccess();
+        dispatch({ type: "update-settings", payload: { startupMode: "unset" }, trackDirty: false });
         dispatch({
           type: "set-sync",
           payload: {

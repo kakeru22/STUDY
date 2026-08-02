@@ -80,7 +80,8 @@ export const seedState: PersistedState = {
     autoSync: false,
     googleClientId: "",
     driveFolderName: "StudyReviewApp",
-    driveFolderId: null
+    driveFolderId: null,
+    startupMode: "unset"
   },
   sync: {
     mode: typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline",

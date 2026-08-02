@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { getQuestionImages } from "../types/question";
 
@@ -35,7 +36,7 @@ export function QuestionListPage() {
 
       <div className="panel filters filters--library">
         <div className="filters__search">
-          <span className="filters__icon" aria-hidden="true">⌕</span>
+          <AppIcon name="search" className="filters__icon" />
           <input type="search" placeholder="検索" value={search} onChange={(event) => setSearch(event.target.value)} />
         </div>
         <div className="chip-row">
@@ -87,7 +88,7 @@ export function QuestionListPage() {
                   編集
                 </Link>
                 <button type="button" className="button-secondary" onClick={() => toggleStar(question.id)}>
-                  {progress?.isStarred ? "お気に入り解除" : "お気に入り"}
+                  {progress?.isStarred ? "重要を外す" : "重要にする"}
                 </button>
               </div>
             </article>

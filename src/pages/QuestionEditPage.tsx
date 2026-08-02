@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { QuestionForm } from "../features/question-form/QuestionForm";
 import type { QuestionDraft } from "../types/question";
@@ -52,48 +53,55 @@ export function QuestionEditPage() {
         </div>
       </div>
 
-      <QuestionForm mode="edit" initialValue={currentQuestion} onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} />
+      <div className="page-shell">
+        <QuestionForm mode="edit" initialValue={currentQuestion} onSubmit={handleSubmit} onSubmitAndExit={handleSubmitAndExit} />
 
-      <aside className="panel save-preview page-side-panel">
-        <div className="page-side-panel__heading">
-          <p className="section-title">Progress</p>
-          <strong>学習状況</strong>
-        </div>
-        <p className="page-side-panel__lead">{message || "更新しながら状況を確認できます。"}</p>
-        <div className="mini-stat-grid">
-          <div className="mini-stat">
-            <span>正解</span>
-            <strong>{progress?.correctCount ?? 0}</strong>
-          </div>
-          <div className="mini-stat">
-            <span>不正解</span>
-            <strong>{progress?.wrongCount ?? 0}</strong>
-          </div>
-          <div className="mini-stat">
-            <span>連続</span>
-            <strong>{progress?.correctStreak ?? 0}</strong>
-          </div>
-          <div className="mini-stat">
-            <span>次回</span>
-            <strong>{progress?.nextReviewAt ? new Date(progress.nextReviewAt).toLocaleDateString("ja-JP") : "未設定"}</strong>
-          </div>
-        </div>
-        <div className="action-stack">
-          <button type="button" className="button-secondary" onClick={() => navigate("/questions")}>
-            問題一覧へ戻る
-          </button>
-          <button
-            type="button"
-            className="button-secondary"
-            onClick={() => {
-              archiveQuestion(currentQuestion.id);
-              navigate("/questions");
-            }}
-          >
-            アーカイブ
-          </button>
-        </div>
-      </aside>
+        <aside className="page-side-column">
+          <section className="panel save-preview page-side-panel">
+            <div className="page-side-panel__heading icon-heading">
+              <span className="icon-heading__mark"><AppIcon name="chart" className="inline-icon" /></span>
+              <div>
+                <p className="section-title">Progress</p>
+                <strong>学習状況</strong>
+              </div>
+            </div>
+            <p className="page-side-panel__lead">{message || "更新しながら状況を確認できます。"}</p>
+            <div className="mini-stat-grid">
+              <div className="mini-stat">
+                <span>正解</span>
+                <strong>{progress?.correctCount ?? 0}</strong>
+              </div>
+              <div className="mini-stat">
+                <span>不正解</span>
+                <strong>{progress?.wrongCount ?? 0}</strong>
+              </div>
+              <div className="mini-stat">
+                <span>連続</span>
+                <strong>{progress?.correctStreak ?? 0}</strong>
+              </div>
+              <div className="mini-stat">
+                <span>次回</span>
+                <strong>{progress?.nextReviewAt ? new Date(progress.nextReviewAt).toLocaleDateString("ja-JP") : "未設定"}</strong>
+              </div>
+            </div>
+            <div className="action-stack">
+              <button type="button" className="button-secondary" onClick={() => navigate("/questions")}>
+                問題一覧へ戻る
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                onClick={() => {
+                  archiveQuestion(currentQuestion.id);
+                  navigate("/questions");
+                }}
+              >
+                アーカイブ
+              </button>
+            </div>
+          </section>
+        </aside>
+      </div>
     </section>
   );
 }
