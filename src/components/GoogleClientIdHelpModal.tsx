@@ -49,13 +49,13 @@ export function GoogleClientIdHelpModal({ open, onClose }: GoogleClientIdHelpMod
                 Google Drive API
               </text>
               <text x="260" y="120" textAnchor="middle" className="help-figure__label">
-                同意画面を作成
+                同意画面を設定
               </text>
               <text x="260" y="148" textAnchor="middle" className="help-figure__sub">
                 テストユーザー追加
               </text>
               <text x="430" y="120" textAnchor="middle" className="help-figure__label">
-                Web Client を作成
+                Web Client 作成
               </text>
               <text x="430" y="148" textAnchor="middle" className="help-figure__sub">
                 Client ID をコピー
@@ -65,17 +65,17 @@ export function GoogleClientIdHelpModal({ open, onClose }: GoogleClientIdHelpMod
 
           <ol className="help-steps">
             <li>Google Cloud Console で新しいプロジェクトを作成</li>
-            <li>「Google Drive API」を有効化</li>
-            <li>「OAuth 同意画面」を作成し、自分の Google アカウントをテストユーザーに追加</li>
-            <li>「認証情報」から「OAuth クライアント ID」を新規作成し、種類は「ウェブアプリ」を選択</li>
-            <li>発行された Client ID をこのアプリに貼り付ける</li>
+            <li>Google Drive API を有効化</li>
+            <li>OAuth 同意画面を作成し、自分の Google アカウントをテストユーザーに追加</li>
+            <li>認証情報から OAuth クライアント ID を新規作成し、種類は「ウェブアプリ」を選択</li>
+            <li>発行された Client ID をこのアプリに貼り付け</li>
           </ol>
 
           <div className="help-note">
-            <strong>このアプリで入力する URL</strong>
+            <strong>このアプリで登録する URL</strong>
             <ul className="plain-list">
               <li>承認済みの JavaScript 生成元: `https://archistudy.netlify.app`</li>
-              <li>認証方式はポップアップなので、通常はリダイレクト URI は不要</li>
+              <li>この構成ではリダイレクト URI は不要</li>
             </ul>
           </div>
 

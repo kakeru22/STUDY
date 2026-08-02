@@ -101,12 +101,16 @@ export function AppRoutes() {
     return <LoadingShell />;
   }
 
-  if (state.settings.startupMode === "drive" && !state.sync.isAuthorized && state.sync.mode === "syncing") {
-    return <LoadingShell />;
+  if (!state.settings.googleClientId.trim()) {
+    return <WelcomeShell />;
   }
 
-  if ((!state.settings.googleClientId.trim() || !state.sync.isAuthorized) && state.settings.startupMode !== "offline") {
+  if (state.settings.startupMode === "unset") {
     return <WelcomeShell />;
+  }
+
+  if (state.settings.startupMode === "drive" && !state.sync.isAuthorized && state.sync.mode === "syncing") {
+    return <LoadingShell />;
   }
 
   return <MainShell />;

@@ -19,7 +19,7 @@ export function WelcomePage() {
       }
       navigate("/");
     } catch (error) {
-      setBusyMessage(error instanceof Error ? error.message : "接続に失敗しました。");
+      setBusyMessage(error instanceof Error ? error.message : "ログインに失敗しました。");
     }
   }
 
@@ -30,7 +30,7 @@ export function WelcomePage() {
 
   const statusLabel =
     state.settings.startupMode === "drive" && !state.sync.isAuthorized
-      ? "接続が切れています"
+      ? "再ログインが必要"
       : state.sync.isAuthorized
         ? "接続済み"
         : "未接続";
@@ -40,7 +40,7 @@ export function WelcomePage() {
       <div className="welcome-shell panel">
         <div className="welcome-copy">
           <h2>再ログイン</h2>
-          <p>Google Drive ともう一度つなぐか、この端末だけで続けるかを選べます。</p>
+          <p>Google Drive と接続するか、この端末だけで使うかを選べます。</p>
         </div>
 
         <div className="welcome-options">
@@ -56,8 +56,8 @@ export function WelcomePage() {
             <span className="welcome-option__icon-wrap">
               <AppIcon name="offline" className="welcome-option__icon" />
             </span>
-            <strong>この端末だけで続ける</strong>
-            <span>オフラインで使う</span>
+            <strong>この端末だけで使う</strong>
+            <span>オフラインで続ける</span>
           </button>
         </div>
 
@@ -67,7 +67,7 @@ export function WelcomePage() {
             <strong>{statusLabel}</strong>
           </div>
           <div className="welcome-meta__item">
-            <span>いまの状態</span>
+            <span>通信状態</span>
             <strong>{state.sync.mode === "offline" ? "オフライン" : "オンライン"}</strong>
           </div>
         </div>

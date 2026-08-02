@@ -7,12 +7,12 @@ const questions: QuestionRecord[] = [
   {
     id: "q_english_001",
     type: "binary",
-    category: "英語基礎",
+    category: "英単語",
     questionText: "apple は「りんご」である。",
     images: [],
     imageDataUrl: null,
     choices: [
-      { id: "a", label: "〇" },
+      { id: "a", label: "○" },
       { id: "b", label: "×" }
     ],
     correctChoiceId: "a",
@@ -28,7 +28,7 @@ const questions: QuestionRecord[] = [
     id: "q_history_001",
     type: "multiple",
     category: "日本史",
-    questionText: "鎌倉幕府の成立年として最も一般的に扱われるものを選べ。",
+    questionText: "鎌倉幕府の成立年として最も一般的に覚えるものを選べ。",
     images: [],
     imageDataUrl: null,
     choices: [
@@ -38,7 +38,7 @@ const questions: QuestionRecord[] = [
       { id: "d", label: "1200年" }
     ],
     correctChoiceId: "c",
-    explanation: "学習方針によって1185年説もあるが、この問題では1192年を正答とする。",
+    explanation: "学習用の定番解答としては 1192年 を正解にしています。",
     tags: ["日本史", "鎌倉"],
     difficulty: 2,
     source: "日本史ノート",

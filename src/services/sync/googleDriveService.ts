@@ -1,4 +1,5 @@
 import type { PersistedState } from "../../types/app";
+import { deleteValue, getValue, setValue } from "../storage/indexedDbClient";
 
 declare global {
   interface Window {
@@ -8,7 +9,12 @@ declare global {
           initTokenClient: (config: {
             client_id: string;
             scope: string;
-            callback: (response: { access_token?: string; error?: string; error_description?: string }) => void;
+            callback: (response: {
+              access_token?: string;
+              error?: string;
+              error_description?: string;
+              expires_in?: number;
+            }) => void;
           }) => { requestAccessToken: (options?: { prompt?: string }) => void };
           revoke: (token: string, done: () => void) => void;
         };
@@ -19,17 +25,61 @@ declare global {
 
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const GOOGLE_SCRIPT_ID = "google-gsi-client";
+const DRIVE_AUTH_SESSION_KEY = "drive-auth-session";
+const EXPIRY_BUFFER_MS = 60_000;
 
 type GoogleAuthSession = {
   accessToken: string | null;
+  expiresAt: number | null;
+};
+
+type PersistedDriveAuthSession = {
+  accessToken: string;
+  expiresAt: number;
 };
 
 const session: GoogleAuthSession = {
-  accessToken: null
+  accessToken: null,
+  expiresAt: null
 };
 
+function isSessionValid(accessToken: string | null, expiresAt: number | null) {
+  return Boolean(accessToken && expiresAt && expiresAt > Date.now() + EXPIRY_BUFFER_MS);
+}
+
+async function persistSession() {
+  if (!isSessionValid(session.accessToken, session.expiresAt)) {
+    await deleteValue(DRIVE_AUTH_SESSION_KEY);
+    return;
+  }
+
+  await setValue<PersistedDriveAuthSession>(DRIVE_AUTH_SESSION_KEY, {
+    accessToken: session.accessToken!,
+    expiresAt: session.expiresAt!
+  });
+}
+
+async function clearPersistedSession() {
+  session.accessToken = null;
+  session.expiresAt = null;
+  await deleteValue(DRIVE_AUTH_SESSION_KEY);
+}
+
+export async function hydrateDriveAccessFromStorage() {
+  const stored = await getValue<PersistedDriveAuthSession>(DRIVE_AUTH_SESSION_KEY);
+
+  if (!stored || !isSessionValid(stored.accessToken, stored.expiresAt)) {
+    await clearPersistedSession();
+    return false;
+  }
+
+  session.accessToken = stored.accessToken;
+  session.expiresAt = stored.expiresAt;
+  return true;
+}
+
 export function hasDriveAccessToken() {
-  return Boolean(session.accessToken);
+  return isSessionValid(session.accessToken, session.expiresAt);
 }
 
 async function loadGoogleScript(): Promise<void> {
@@ -69,7 +119,7 @@ function waitForGoogle(): Promise<void> {
 
       if (Date.now() - startedAt > 10000) {
         window.clearInterval(timer);
-        reject(new Error("Google Identity Services の初期化がタイムアウトしました。"));
+        reject(new Error("Google Identity Services の起動がタイムアウトしました。"));
       }
     }, 100);
   });
@@ -80,19 +130,25 @@ export async function requestDriveAccessToken(clientId: string, prompt: "" | "co
     throw new Error("Google Client ID が未設定です。");
   }
 
+  if (hasDriveAccessToken()) {
+    return session.accessToken!;
+  }
+
   await loadGoogleScript();
 
   return new Promise((resolve, reject) => {
     const tokenClient = window.google!.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: DRIVE_SCOPE,
-      callback: (response) => {
+      callback: async (response) => {
         if (response.error || !response.access_token) {
-          reject(new Error(response.error_description || response.error || "Google認証に失敗しました。"));
+          reject(new Error(response.error_description || response.error || "Google ログインに失敗しました。"));
           return;
         }
 
         session.accessToken = response.access_token;
+        session.expiresAt = Date.now() + (response.expires_in ?? 3600) * 1000;
+        await persistSession();
         resolve(response.access_token);
       }
     });
@@ -102,21 +158,24 @@ export async function requestDriveAccessToken(clientId: string, prompt: "" | "co
 }
 
 export function revokeDriveAccess() {
-  if (!session.accessToken || !window.google?.accounts?.oauth2) {
-    session.accessToken = null;
+  const token = session.accessToken;
+  void clearPersistedSession();
+
+  if (!token || !window.google?.accounts?.oauth2) {
     return;
   }
 
-  const token = session.accessToken;
-  session.accessToken = null;
   window.google.accounts.oauth2.revoke(token, () => undefined);
 }
 
 function getAccessToken() {
-  if (!session.accessToken) {
+  if (!hasDriveAccessToken()) {
+    session.accessToken = null;
+    session.expiresAt = null;
+    void deleteValue(DRIVE_AUTH_SESSION_KEY);
     throw new Error("Google Drive 連携が未認証です。");
   }
-  return session.accessToken;
+  return session.accessToken!;
 }
 
 async function driveFetch<T>(input: string, init?: RequestInit): Promise<T> {

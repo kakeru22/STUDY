@@ -13,6 +13,7 @@ import { loadPersistedState, savePersistedState } from "../services/storage/appS
 import { calculateNextReviewDate } from "../services/review/reviewScheduler";
 import {
   hasDriveAccessToken,
+  hydrateDriveAccessFromStorage,
   pullSnapshotFromDrive,
   pushSnapshotToDrive,
   requestDriveAccessToken,
@@ -131,6 +132,7 @@ function reducer(state: AppState, action: Action): AppState {
         nextReviewAt: null,
         isStarred: false
       };
+
       return {
         ...state,
         progress: {
@@ -140,7 +142,7 @@ function reducer(state: AppState, action: Action): AppState {
             isStarred: !current.isStarred
           }
         },
-        sync: markDirty(state.sync, "重要設定を更新しました。")
+        sync: markDirty(state.sync, "スター設定を更新しました。")
       };
     }
     case "archive-question":
@@ -216,7 +218,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
-  const autoReconnectAttemptedRef = useRef(false);
   const stateRef = useRef(state);
 
   useEffect(() => {
@@ -254,7 +255,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           payload: {
             mode: "offline",
             isAuthorized: false,
-            statusMessage: "Google の接続が切れました。もう一度接続してください。"
+            statusMessage: "Google の認証が切れました。もう一度ログインしてください。"
           }
         });
       } else {
@@ -262,7 +263,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: "set-sync",
           payload: {
             mode: "offline",
-            statusMessage: "同期できなかったため、オフラインモードに切り替えました。"
+            statusMessage: "同期できませんでした。オフラインモードに切り替えました。"
           }
         });
       }
@@ -304,7 +305,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           payload: {
             mode: "offline",
             isAuthorized: false,
-            statusMessage: "Google の接続が切れました。もう一度接続してください。"
+            statusMessage: "Google の認証が切れました。もう一度ログインしてください。"
           }
         });
       } else {
@@ -312,7 +313,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: "set-sync",
           payload: {
             mode: "offline",
-            statusMessage: "Drive を読み込めなかったため、オフラインモードに切り替えました。"
+            statusMessage: "Drive を読み込めませんでした。オフラインモードに切り替えました。"
           }
         });
       }
@@ -321,8 +322,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    loadPersistedState().then((persisted) => {
-      const canUseDriveSession = persisted.sync.isAuthorized && hasDriveAccessToken();
+    void Promise.all([loadPersistedState(), hydrateDriveAccessFromStorage()]).then(([persisted, canUseDriveSession]) => {
       dispatch({
         type: "hydrate",
         payload: {
@@ -331,59 +331,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
             ...persisted.sync,
             isAuthorized: canUseDriveSession,
             mode: navigator.onLine ? (canUseDriveSession ? "online" : "offline") : "offline",
-            statusMessage: canUseDriveSession ? "" : persisted.settings.startupMode === "drive" ? "Google に再接続してください。" : ""
+            statusMessage: canUseDriveSession ? "" : persisted.settings.startupMode === "drive" ? "Google に再ログインしてください。" : ""
           }
         }
       });
     });
   }, []);
-
-  useEffect(() => {
-    if (!state.isHydrated || autoReconnectAttemptedRef.current) {
-      return;
-    }
-
-    const shouldReconnect =
-      state.settings.startupMode === "drive" &&
-      isOnline &&
-      !state.sync.isAuthorized &&
-      state.settings.googleClientId.trim().length > 0;
-
-    if (!shouldReconnect) {
-      return;
-    }
-
-    autoReconnectAttemptedRef.current = true;
-    dispatch({
-      type: "set-sync",
-      payload: {
-        mode: "syncing",
-        statusMessage: "Google Drive に再接続しています。"
-      }
-    });
-
-    void requestDriveAccessToken(state.settings.googleClientId, "")
-      .then(() => {
-        dispatch({
-          type: "set-sync",
-          payload: {
-            mode: "online",
-            isAuthorized: true,
-            statusMessage: ""
-          }
-        });
-      })
-      .catch(() => {
-        dispatch({
-          type: "set-sync",
-          payload: {
-            mode: "offline",
-            isAuthorized: false,
-            statusMessage: "Google Drive に再接続できませんでした。"
-          }
-        });
-      });
-  }, [isOnline, state.isHydrated, state.settings.googleClientId, state.settings.startupMode, state.sync.isAuthorized]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -433,7 +386,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (state.sync.unsyncedCount <= 0 || state.sync.mode === "syncing") {
+    if (state.sync.unsyncedCount <= 0 || state.sync.mode === "syncing" || !hasDriveAccessToken()) {
       return;
     }
 
@@ -504,7 +457,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "update-settings", payload: { startupMode: mode }, trackDirty: false });
       },
       async authorizeGoogleDrive() {
-        dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google に接続しています。" } });
+        dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google にログインしています。" } });
         try {
           await requestDriveAccessToken(state.settings.googleClientId);
           dispatch({ type: "update-settings", payload: { startupMode: "drive" }, trackDirty: false });
@@ -522,7 +475,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             payload: {
               mode: navigator.onLine ? "online" : "offline",
               isAuthorized: false,
-              statusMessage: error instanceof Error ? error.message : "Google 接続に失敗しました。"
+              statusMessage: error instanceof Error ? error.message : "Google ログインに失敗しました。"
             }
           });
           throw error;
