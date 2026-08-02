@@ -18,7 +18,8 @@ type AppIconName =
   | "folder"
   | "clock"
   | "star"
-  | "archive";
+  | "archive"
+  | "close";
 
 type AppIconProps = {
   name: AppIconName;
@@ -137,6 +138,12 @@ const iconPaths: Record<AppIconName, ReactNode> = {
       <rect x="4" y="5" width="16" height="4" rx="1" />
       <path d="M6 9h12v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z" />
       <path d="M10 13h4" />
+    </>
+  ),
+  close: (
+    <>
+      <path d="M7 7l10 10" />
+      <path d="M17 7L7 17" />
     </>
   )
 };

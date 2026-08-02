@@ -1,15 +1,18 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { getQuestionImages } from "../types/question";
 
 type ReviewMode = "today" | "random" | "starred";
+
 type ReviewResult = {
   questionId: string;
   selectedChoiceId: string;
   correct: boolean;
   nextReviewAt: string;
 };
+
 type ReviewSession = {
   mode: ReviewMode;
   questionIds: string[];
@@ -89,13 +92,14 @@ export function ReviewPage() {
   const isResultRoute = location.pathname === "/review/result";
   const session = readSession();
 
-  const counts = useMemo(() => {
-    return {
+  const counts = useMemo(
+    () => ({
       today: selectQuestions("today", state.questions, state.progress).length,
       random: selectQuestions("random", state.questions, state.progress).length,
       starred: selectQuestions("starred", state.questions, state.progress).length
-    };
-  }, [state.progress, state.questions]);
+    }),
+    [state.progress, state.questions]
+  );
 
   const questions = useMemo(() => {
     if (!session) {
@@ -109,10 +113,11 @@ export function ReviewPage() {
 
   const currentQuestion = session ? questions[session.currentIndex] ?? null : null;
   const currentImages = currentQuestion ? getQuestionImages(currentQuestion) : [];
-  const modeCards: Array<{ mode: ReviewMode; title: string; caption: string; icon: string; count: number }> = [
-    { mode: "today", title: "今日", caption: "Due", icon: "◔", count: counts.today },
-    { mode: "random", title: "ランダム", caption: "Mix", icon: "✦", count: counts.random },
-    { mode: "starred", title: "重要", caption: "Star", icon: "★", count: counts.starred }
+
+  const modeCards: Array<{ mode: ReviewMode; title: string; caption: string; icon: "clock" | "review" | "star"; count: number }> = [
+    { mode: "today", title: "今日の復習", caption: "期限が来た問題", icon: "clock", count: counts.today },
+    { mode: "random", title: "ランダム", caption: "全体から出題", icon: "review", count: counts.random },
+    { mode: "starred", title: "重要", caption: "マークした問題", icon: "star", count: counts.starred }
   ];
 
   function startSession(mode: ReviewMode) {
@@ -179,11 +184,10 @@ export function ReviewPage() {
       return (
         <section className="page review-scene">
           <article className="panel review-shell review-shell--empty">
-            <p className="eyebrow">Review Session</p>
-            <h2>セッションが見つかりません</h2>
-            <p>復習メニューから開始してください。</p>
+            <h2>復習セッションがありません</h2>
+            <p>復習メニューから始めてください。</p>
             <button type="button" onClick={() => navigate("/review")}>
-              復習メニューへ戻る
+              復習メニューへ
             </button>
           </article>
         </section>
@@ -193,18 +197,17 @@ export function ReviewPage() {
     return (
       <section className="page review-scene">
         <article className="panel review-shell">
-          <div className="review-shell__topbar">
-            <button type="button" className="button-secondary" onClick={finishSession}>
-              戻る
-            </button>
-            <span className="review-shell__badge">Offline</span>
-          </div>
+          <button type="button" className="review-shell__close" onClick={finishSession} aria-label="復習を終了">
+            <AppIcon name="close" className="review-shell__close-icon" />
+          </button>
+
           <div className="review-progress review-progress--wide">
             <span>
               {session.currentIndex + 1} / {questions.length}
             </span>
-            <span>{session.mode === "today" ? "今日の復習" : session.mode === "random" ? "ランダム" : "お気に入り"}</span>
+            <span>{session.mode === "today" ? "今日の復習" : session.mode === "random" ? "ランダム" : "重要"}</span>
           </div>
+
           <div className="review-question">
             <p className="eyebrow">Q</p>
             <h2>{currentQuestion.questionText}</h2>
@@ -218,6 +221,7 @@ export function ReviewPage() {
               </div>
             ) : null}
           </div>
+
           <div className="review-choices">
             {currentQuestion.choices.map((choice, index) => (
               <button key={choice.id} type="button" className="answer-choice" onClick={() => handleAnswer(choice.id)}>
@@ -236,11 +240,10 @@ export function ReviewPage() {
       return (
         <section className="page review-scene">
           <article className="panel review-shell review-shell--empty">
-            <p className="eyebrow">Result</p>
             <h2>結果がありません</h2>
             <p>問題に回答すると結果が表示されます。</p>
             <button type="button" onClick={() => navigate("/review")}>
-              復習メニューへ戻る
+              復習メニューへ
             </button>
           </article>
         </section>
@@ -255,6 +258,10 @@ export function ReviewPage() {
     return (
       <section className="page review-scene">
         <article className="panel review-shell review-shell--result">
+          <button type="button" className="review-shell__close" onClick={finishSession} aria-label="復習を終了">
+            <AppIcon name="close" className="review-shell__close-icon" />
+          </button>
+
           <div className="result-hero">
             <div className={session.result.correct ? "result-hero__mark is-correct" : "result-hero__mark is-wrong"} aria-hidden="true">
               <svg viewBox="0 0 120 120">
@@ -271,23 +278,23 @@ export function ReviewPage() {
             <div>
               <p className="eyebrow">Result</p>
               <h2>{session.result.correct ? "正解" : "不正解"}</h2>
-              <p>{session.result.correct ? "Good" : "Check"}</p>
+              <p>{session.result.correct ? "そのまま次へ進めます。" : "解説を確認してください。"}</p>
             </div>
           </div>
 
           <div className="result-grid">
             <div className="result-card">
-              <p className="section-title">Your</p>
-              <strong>{selectedChoice?.label ?? "未選択"}</strong>
+              <p className="section-title">あなたの回答</p>
+              <strong>{selectedChoice?.label ?? "未回答"}</strong>
             </div>
             <div className="result-card">
-              <p className="section-title">Answer</p>
+              <p className="section-title">正解</p>
               <strong>{correctChoice?.label ?? "-"}</strong>
             </div>
           </div>
 
           <div className="panel result-note">
-            <p className="section-title">Note</p>
+            <p className="section-title">解説</p>
             {resultImages.length > 0 ? (
               <div className="review-question__image-grid">
                 {resultImages.map((image, index) => (
@@ -297,17 +304,17 @@ export function ReviewPage() {
                 ))}
               </div>
             ) : null}
-            <p>{currentQuestion.explanation}</p>
-            <p>Next: {new Date(session.result.nextReviewAt).toLocaleDateString("ja-JP")}</p>
-            <p>Sync: {state.sync.unsyncedCount > 0 ? "pending" : "done"}</p>
+            <p>{currentQuestion.explanation || "解説はありません。"}</p>
+            <p>次回: {new Date(session.result.nextReviewAt).toLocaleDateString("ja-JP")}</p>
+            <p>{state.sync.unsyncedCount > 0 ? "未同期の変更があります" : "同期済みです"}</p>
           </div>
 
           <div className="review-scene__actions">
             <button type="button" onClick={handleNext}>
-              {isLastQuestion ? "閉じる" : "次へ"}
+              {isLastQuestion ? "終了" : "次へ"}
             </button>
             <button type="button" className="button-secondary" onClick={finishSession}>
-              終了
+              ここで終わる
             </button>
           </div>
         </article>
@@ -324,14 +331,8 @@ export function ReviewPage() {
 
       <div className="review-menu">
         {modeCards.map((card) => (
-          <button
-            key={card.mode}
-            type="button"
-            className="review-mode-card"
-            onClick={() => startSession(card.mode)}
-            disabled={card.count === 0}
-          >
-            <span className="review-mode-card__icon" aria-hidden="true">{card.icon}</span>
+          <button key={card.mode} type="button" className="review-mode-card" onClick={() => startSession(card.mode)} disabled={card.count === 0}>
+            <AppIcon name={card.icon} className="review-mode-card__icon" />
             <span className="review-mode-card__count">{card.count}</span>
             <strong>{card.title}</strong>
             <span>{card.caption}</span>
@@ -341,8 +342,8 @@ export function ReviewPage() {
 
       {modeCards.every((card) => card.count === 0) ? (
         <article className="panel">
-          <h3>出題できる問題がありません</h3>
-          <p>問題を追加するか、一覧からお気に入りを設定してください。</p>
+          <h3>復習できる問題がありません</h3>
+          <p>問題を追加するか、一覧から重要設定をしてください。</p>
         </article>
       ) : null}
     </section>
