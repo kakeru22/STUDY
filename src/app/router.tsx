@@ -1,7 +1,6 @@
 import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { AppIcon } from "../components/AppIcon";
-import { StatusBanner } from "../components/StatusBanner";
 import { SyncBadge } from "../components/SyncBadge";
 import { useAppContext } from "../contexts/AppContext";
 import { HomePage } from "../pages/HomePage";
@@ -61,7 +60,6 @@ function MainShell() {
   return (
     <div className={isReviewFlow ? "app-shell app-shell--immersive" : "app-shell"}>
       <AppHeader title="AnkiSoft" rightSlot={<SyncBadge state={state.sync} />} />
-      {!isReviewFlow ? <StatusBanner state={state.sync} /> : null}
       <main className="page-content">
         <Routes>
           <Route path="/" element={<HomePage />} />

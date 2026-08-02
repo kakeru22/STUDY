@@ -7,9 +7,9 @@ type SyncBadgeProps = {
 export function SyncBadge({ state }: SyncBadgeProps) {
   const labels = {
     offline: "オフライン",
-    online: state.isAuthorized ? "オンライン" : "未接続",
+    online: state.isAuthorized ? "同期中" : "未接続",
     syncing: "同期中",
-    conflict: "競合あり"
+    conflict: "要確認"
   };
 
   return <span className={`sync-badge sync-badge--${state.mode}`}>{labels[state.mode]}</span>;

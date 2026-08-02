@@ -28,6 +28,10 @@ const session: GoogleAuthSession = {
   accessToken: null
 };
 
+export function hasDriveAccessToken() {
+  return Boolean(session.accessToken);
+}
+
 async function loadGoogleScript(): Promise<void> {
   if (window.google?.accounts?.oauth2) {
     return;
@@ -265,4 +269,3 @@ export async function pullSnapshotFromDrive(folderName: string): Promise<{
     }
   };
 }
-

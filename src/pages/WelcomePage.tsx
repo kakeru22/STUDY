@@ -9,7 +9,7 @@ export function WelcomePage() {
   const [busyMessage, setBusyMessage] = useState("");
 
   async function handleDriveStart() {
-    setBusyMessage("接続中...");
+    setBusyMessage("Google Drive に接続しています...");
     try {
       await authorizeGoogleDrive();
       try {
@@ -28,11 +28,19 @@ export function WelcomePage() {
     navigate("/");
   }
 
+  const statusLabel =
+    state.settings.startupMode === "drive" && !state.sync.isAuthorized
+      ? "接続が切れています"
+      : state.sync.isAuthorized
+        ? "接続済み"
+        : "未接続";
+
   return (
     <section className="page welcome-page">
       <div className="welcome-shell panel">
         <div className="welcome-copy">
-          <h2>Start</h2>
+          <h2>使い方を選ぶ</h2>
+          <p>Google Drive と同期して使うか、この端末だけで使うかを選べます。</p>
         </div>
 
         <div className="welcome-options">
@@ -40,27 +48,27 @@ export function WelcomePage() {
             <span className="welcome-option__icon-wrap">
               <AppIcon name="drive" className="welcome-option__icon" />
             </span>
-            <strong>Google</strong>
-            <span>Drive Sync</span>
+            <strong>Google Drive と使う</strong>
+            <span>自動で同期します</span>
           </button>
 
           <button type="button" className="welcome-option" onClick={handleOfflineStart}>
             <span className="welcome-option__icon-wrap">
               <AppIcon name="offline" className="welcome-option__icon" />
             </span>
-            <strong>Offline</strong>
-            <span>Local Only</span>
+            <strong>この端末だけで使う</strong>
+            <span>通信なしでも使えます</span>
           </button>
         </div>
 
         <div className="welcome-meta">
           <div className="welcome-meta__item">
-            <span>Sync</span>
-            <strong>{state.sync.isAuthorized ? "Ready" : "Locked"}</strong>
+            <span>接続状態</span>
+            <strong>{statusLabel}</strong>
           </div>
           <div className="welcome-meta__item">
-            <span>Mode</span>
-            <strong>{state.sync.mode}</strong>
+            <span>同期モード</span>
+            <strong>{state.sync.mode === "offline" ? "オフライン" : "オンライン"}</strong>
           </div>
         </div>
 
