@@ -25,7 +25,7 @@ export type QuestionDraft = {
 };
 
 export const BINARY_CHOICES: QuestionChoice[] = [
-  { id: "a", label: "〇" },
+  { id: "a", label: "○" },
   { id: "b", label: "×" }
 ];
 

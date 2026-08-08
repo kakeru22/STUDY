@@ -26,8 +26,9 @@ import type { SyncMode } from "../types/sync";
 
 type AppContextValue = {
   state: AppState;
-  addQuestion: (draft: QuestionDraft) => void;
+  addQuestion: (draft: QuestionDraft) => string;
   updateQuestion: (id: string, draft: QuestionDraft) => void;
+  deleteQuestion: (id: string) => void;
   toggleStar: (questionId: string) => void;
   archiveQuestion: (questionId: string) => void;
   answerQuestion: (questionId: string, selectedChoiceId: string) => { correct: boolean; nextReviewAt: string };
@@ -46,6 +47,7 @@ type Action =
   | { type: "set-sync"; payload: Partial<AppState["sync"]> }
   | { type: "add-question"; payload: QuestionRecord }
   | { type: "update-question"; payload: { id: string; draft: QuestionDraft } }
+  | { type: "delete-question"; payload: { id: string } }
   | { type: "toggle-star"; payload: { questionId: string } }
   | { type: "archive-question"; payload: { questionId: string } }
   | { type: "answer-question"; payload: { questionId: string; selectedChoiceId: string; answeredAt: string } }
@@ -104,7 +106,7 @@ function reducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         questions: [action.payload, ...state.questions],
-        sync: markDirty(state.sync, "問題を保存しました。")
+        sync: markDirty(state.sync, "問題を追加しました。")
       };
     case "update-question":
       return {
@@ -120,6 +122,17 @@ function reducer(state: AppState, action: Action): AppState {
         ),
         sync: markDirty(state.sync, "問題を更新しました。")
       };
+    case "delete-question": {
+      const nextProgress = { ...state.progress };
+      delete nextProgress[action.payload.id];
+
+      return {
+        ...state,
+        questions: state.questions.filter((question) => question.id !== action.payload.id),
+        progress: nextProgress,
+        sync: markDirty(state.sync, "問題を削除しました。")
+      };
+    }
     case "toggle-star": {
       const current = state.progress[action.payload.questionId] ?? {
         questionId: action.payload.questionId,
@@ -412,19 +425,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       state,
       addQuestion(draft) {
         const timestamp = new Date().toISOString();
+        const id = `q_${Date.now()}`;
         dispatch({
           type: "add-question",
           payload: {
             ...draft,
-            id: `q_${Date.now()}`,
+            id,
             createdAt: timestamp,
             updatedAt: timestamp,
             archived: false
           }
         });
+        return id;
       },
       updateQuestion(id, draft) {
         dispatch({ type: "update-question", payload: { id, draft } });
+      },
+      deleteQuestion(id) {
+        dispatch({ type: "delete-question", payload: { id } });
       },
       toggleStar(questionId) {
         dispatch({ type: "toggle-star", payload: { questionId } });

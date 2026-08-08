@@ -11,7 +11,7 @@ type QuestionFormProps = {
   onSaveDraft?: (draft: QuestionDraft) => Promise<void> | void;
 };
 
-const suggestedTags = ["重要", "頻出", "苦手", "基本", "確認"];
+const suggestedTags = ["スター", "頻出", "暗記", "基本", "要復習"];
 
 const MAX_IMAGE_COUNT = 6;
 const MAX_IMAGE_WIDTH = 1600;
@@ -43,7 +43,7 @@ async function fileToCompressedDataUrl(file: File) {
   const context = canvas.getContext("2d");
 
   if (!context) {
-    throw new Error("画像圧縮の準備に失敗しました。");
+    throw new Error("画像処理の準備に失敗しました。");
   }
 
   context.drawImage(image, 0, 0, targetWidth, targetHeight);
@@ -213,7 +213,7 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
             type="text"
             value={draft.category}
             onChange={(event) => setField("category", event.target.value)}
-            placeholder="建築史 / 法規 / 構造"
+            placeholder="建築計画 / 英単語 / 法規"
           />
           {errors.category ? <small className="field-error">{errors.category}</small> : null}
         </label>
@@ -300,7 +300,7 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
 
         <div className="choice-panel field">
           <div className="choice-panel__header">
-            <span>回答候補 *</span>
+            <span>選択肢一覧 *</span>
             <small>{draft.type === "multiple" ? `${draft.choices.length} / 6` : "○×は固定です"}</small>
           </div>
           {draft.choices.map((choice, index) => (
@@ -439,7 +439,7 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
 
           <label className="field">
             <span>出典</span>
-            <input type="text" value={draft.source} onChange={(event) => setField("source", event.target.value)} placeholder="参考書 / ノート / 授業" />
+            <input type="text" value={draft.source} onChange={(event) => setField("source", event.target.value)} placeholder="参考書 / ノート / 講義名" />
           </label>
         </div>
       </section>

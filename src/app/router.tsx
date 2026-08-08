@@ -22,13 +22,18 @@ const navItems = [
 
 function LoadingShell() {
   return (
-    <div className="app-shell app-shell--loading">
-      <AppHeader title="AnkiSoft" rightSlot={null} />
-      <main className="page-content">
-        <section className="panel loading-panel">
-          <p className="section-title">Loading</p>
-          <p>ローカルデータを読み込んでいます。</p>
-        </section>
+    <div className="app-shell app-shell--loading app-shell--splash">
+      <main className="splash-screen" aria-live="polite" aria-busy="true">
+        <div className="splash-screen__logo">
+          <span className="splash-screen__badge">A</span>
+          <strong>AnkiSoft</strong>
+        </div>
+        <div className="splash-screen__orbit" aria-hidden="true">
+          <span className="splash-screen__dot splash-screen__dot--one" />
+          <span className="splash-screen__dot splash-screen__dot--two" />
+          <span className="splash-screen__dot splash-screen__dot--three" />
+        </div>
+        <p className="splash-screen__message">ログイン状況とローカルデータを確認しています。</p>
       </main>
     </div>
   );

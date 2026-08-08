@@ -8,7 +8,7 @@ import type { QuestionDraft } from "../types/question";
 export function QuestionEditPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
-  const { state, archiveQuestion, updateQuestion } = useAppContext();
+  const { state, archiveQuestion, deleteQuestion, updateQuestion } = useAppContext();
   const [message, setMessage] = useState("");
 
   const question = useMemo(() => state.questions.find((item) => item.id === id), [id, state.questions]);
@@ -40,6 +40,20 @@ export function QuestionEditPage() {
     navigate("/questions");
   }
 
+  function handleDelete() {
+    const confirmed = window.confirm("この問題を完全に削除します。元に戻せません。");
+    if (!confirmed) {
+      return;
+    }
+
+    deleteQuestion(currentQuestion.id);
+    navigate("/questions", {
+      state: {
+        toastMessage: "問題を削除しました。"
+      }
+    });
+  }
+
   return (
     <section className="page">
       <div className="page-heading page-heading--split">
@@ -59,13 +73,15 @@ export function QuestionEditPage() {
         <aside className="page-side-column">
           <section className="panel save-preview page-side-panel">
             <div className="page-side-panel__heading icon-heading">
-              <span className="icon-heading__mark"><AppIcon name="chart" className="inline-icon" /></span>
+              <span className="icon-heading__mark">
+                <AppIcon name="chart" className="inline-icon" />
+              </span>
               <div>
                 <p className="section-title">Progress</p>
                 <strong>学習状況</strong>
               </div>
             </div>
-            <p className="page-side-panel__lead">{message || "更新しながら状況を確認できます。"}</p>
+            <p className="page-side-panel__lead">{message || "更新すると進捗の見直しにすぐ反映されます。"}</p>
             <div className="mini-stat-grid">
               <div className="mini-stat">
                 <span>正解</span>
@@ -93,10 +109,17 @@ export function QuestionEditPage() {
                 className="button-secondary"
                 onClick={() => {
                   archiveQuestion(currentQuestion.id);
-                  navigate("/questions");
+                  navigate("/questions", {
+                    state: {
+                      toastMessage: "問題をアーカイブしました。"
+                    }
+                  });
                 }}
               >
                 アーカイブ
+              </button>
+              <button type="button" className="button-secondary button-danger" onClick={handleDelete}>
+                完全削除
               </button>
             </div>
           </section>

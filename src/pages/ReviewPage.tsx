@@ -116,8 +116,8 @@ export function ReviewPage() {
 
   const modeCards: Array<{ mode: ReviewMode; title: string; caption: string; icon: "clock" | "review" | "star"; count: number }> = [
     { mode: "today", title: "今日の復習", caption: "期限が来た問題", icon: "clock", count: counts.today },
-    { mode: "random", title: "ランダム", caption: "全体から出題", icon: "review", count: counts.random },
-    { mode: "starred", title: "重要", caption: "マークした問題", icon: "star", count: counts.starred }
+    { mode: "random", title: "ランダム", caption: "全体から復習", icon: "review", count: counts.random },
+    { mode: "starred", title: "スター", caption: "印を付けた問題", icon: "star", count: counts.starred }
   ];
 
   function startSession(mode: ReviewMode) {
@@ -205,7 +205,7 @@ export function ReviewPage() {
             <span>
               {session.currentIndex + 1} / {questions.length}
             </span>
-            <span>{session.mode === "today" ? "今日の復習" : session.mode === "random" ? "ランダム" : "重要"}</span>
+            <span>{session.mode === "today" ? "今日の復習" : session.mode === "random" ? "ランダム" : "スター"}</span>
           </div>
 
           <div className="review-question">
@@ -226,7 +226,7 @@ export function ReviewPage() {
             {currentQuestion.choices.map((choice, index) => (
               <button key={choice.id} type="button" className="answer-choice" onClick={() => handleAnswer(choice.id)}>
                 <span className="answer-choice__index">{String.fromCharCode(65 + index)}</span>
-                <span>{choice.label}</span>
+                <span className="answer-choice__text">{choice.label}</span>
               </button>
             ))}
           </div>
@@ -278,7 +278,7 @@ export function ReviewPage() {
             <div>
               <p className="eyebrow">Result</p>
               <h2>{session.result.correct ? "正解" : "不正解"}</h2>
-              <p>{session.result.correct ? "そのまま次へ進めます。" : "解説を確認してください。"}</p>
+              <p>{session.result.correct ? "そのまま次へ進めます。" : "問題文と解説を並べて確認できます。"}</p>
             </div>
           </div>
 
@@ -294,7 +294,8 @@ export function ReviewPage() {
           </div>
 
           <div className="panel result-note">
-            <p className="section-title">解説</p>
+            <p className="section-title">問題</p>
+            <p className="result-note__question">{currentQuestion.questionText}</p>
             {resultImages.length > 0 ? (
               <div className="review-question__image-grid">
                 {resultImages.map((image, index) => (
@@ -304,9 +305,27 @@ export function ReviewPage() {
                 ))}
               </div>
             ) : null}
+            <div className="result-note__answer-list">
+              {currentQuestion.choices.map((choice, index) => (
+                <div
+                  key={choice.id}
+                  className={
+                    choice.id === currentQuestion.correctChoiceId
+                      ? "result-note__answer is-correct"
+                      : choice.id === session.result?.selectedChoiceId
+                        ? "result-note__answer is-selected"
+                        : "result-note__answer"
+                  }
+                >
+                  <span>{String.fromCharCode(65 + index)}</span>
+                  <strong>{choice.label}</strong>
+                </div>
+              ))}
+            </div>
+            <p className="section-title">解説</p>
             <p>{currentQuestion.explanation || "解説はありません。"}</p>
             <p>次回: {new Date(session.result.nextReviewAt).toLocaleDateString("ja-JP")}</p>
-            <p>{state.sync.unsyncedCount > 0 ? "未同期の変更があります" : "同期済みです"}</p>
+            <p>{state.sync.unsyncedCount > 0 ? "未同期の変更があります。" : "同期状態は最新です。"}</p>
           </div>
 
           <div className="review-scene__actions">
@@ -343,7 +362,7 @@ export function ReviewPage() {
       {modeCards.every((card) => card.count === 0) ? (
         <article className="panel">
           <h3>復習できる問題がありません</h3>
-          <p>問題を追加するか、一覧から重要設定をしてください。</p>
+          <p>問題を追加するか、一覧からスター設定をしてください。</p>
         </article>
       ) : null}
     </section>

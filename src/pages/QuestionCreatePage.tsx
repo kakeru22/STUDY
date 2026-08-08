@@ -9,22 +9,27 @@ export function QuestionCreatePage() {
   const navigate = useNavigate();
   const { addQuestion } = useAppContext();
   const [lastSaved, setLastSaved] = useState<QuestionDraft | null>(null);
-  const [message, setMessage] = useState("フォーム入力を始めてください。");
+  const [message, setMessage] = useState("入力すると右側に保存状況が反映されます。");
 
   async function handleSubmit(draft: QuestionDraft) {
     addQuestion(draft);
     setLastSaved(draft);
-    setMessage(`「${draft.category}」の問題をローカル保存しました。`);
+    setMessage(`「${draft.category}」の問題を追加しました。続けて入力できます。`);
   }
 
   async function handleSaveDraft(draft: QuestionDraft) {
     setLastSaved(draft);
-    setMessage("下書き内容を保持しました。");
+    setMessage("入力中の内容を一時保存しました。");
   }
 
   async function handleSubmitAndExit(draft: QuestionDraft) {
-    addQuestion(draft);
-    navigate("/questions");
+    const createdId = addQuestion(draft);
+    navigate("/questions", {
+      state: {
+        highlightQuestionId: createdId,
+        toastMessage: "問題を追加しました。先頭に表示しています。"
+      }
+    });
   }
 
   return (
@@ -35,8 +40,8 @@ export function QuestionCreatePage() {
           <h2>問題追加</h2>
         </div>
         <div className="page-heading__meta">
-          <span>Local Save</span>
-          <strong>{lastSaved ? "保存済み" : "編集中"}</strong>
+          <span>保存状況</span>
+          <strong>{lastSaved ? "保存済み" : "入力中"}</strong>
         </div>
       </div>
 
@@ -46,10 +51,12 @@ export function QuestionCreatePage() {
         <aside className="page-side-column">
           <section className="panel save-preview page-side-panel">
             <div className="page-side-panel__heading icon-heading">
-              <span className="icon-heading__mark"><AppIcon name="check" className="inline-icon" /></span>
+              <span className="icon-heading__mark">
+                <AppIcon name="check" className="inline-icon" />
+              </span>
               <div>
                 <p className="section-title">State</p>
-                <strong>保存状態</strong>
+                <strong>保存状況</strong>
               </div>
             </div>
             <p className="page-side-panel__lead">{message}</p>
@@ -57,7 +64,7 @@ export function QuestionCreatePage() {
               <div className="mini-stat-grid">
                 <div className="mini-stat">
                   <span>形式</span>
-                  <strong>{lastSaved.type === "binary" ? "〇×" : "N択"}</strong>
+                  <strong>{lastSaved.type === "binary" ? "○×" : "N択"}</strong>
                 </div>
                 <div className="mini-stat">
                   <span>タグ</span>

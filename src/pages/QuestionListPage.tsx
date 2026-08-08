@@ -1,14 +1,44 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { getQuestionImages } from "../types/question";
 
+type ListRouteState = {
+  highlightQuestionId?: string;
+  toastMessage?: string;
+};
+
 export function QuestionListPage() {
   const { state, toggleStar } = useAppContext();
+  const location = useLocation();
+  const routeState = (location.state ?? {}) as ListRouteState;
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<"all" | "binary" | "multiple">("all");
   const [starOnly, setStarOnly] = useState(false);
+  const [toastMessage, setToastMessage] = useState(routeState.toastMessage ?? "");
+
+  useEffect(() => {
+    if (!routeState.highlightQuestionId) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      const element = document.getElementById(`question-card-${routeState.highlightQuestionId}`);
+      element?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+
+    return () => window.clearTimeout(timer);
+  }, [routeState.highlightQuestionId]);
+
+  useEffect(() => {
+    if (!toastMessage) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => setToastMessage(""), 2800);
+    return () => window.clearTimeout(timer);
+  }, [toastMessage]);
 
   const visibleQuestions = useMemo(() => {
     return state.questions
@@ -29,10 +59,12 @@ export function QuestionListPage() {
           <h2>問題一覧</h2>
         </div>
         <div className="page-heading__meta">
-          <span>Visible</span>
+          <span>表示件数</span>
           <strong>{visibleQuestions.length}</strong>
         </div>
       </div>
+
+      {toastMessage ? <div className="inline-toast">{toastMessage}</div> : null}
 
       <div className="panel filters filters--library">
         <div className="filters__search">
@@ -44,13 +76,13 @@ export function QuestionListPage() {
             すべて
           </button>
           <button type="button" className={typeFilter === "binary" ? "toggle-chip is-active" : "toggle-chip"} onClick={() => setTypeFilter("binary")}>
-            〇×
+            ○×
           </button>
           <button type="button" className={typeFilter === "multiple" ? "toggle-chip is-active" : "toggle-chip"} onClick={() => setTypeFilter("multiple")}>
             N択
           </button>
           <button type="button" className={starOnly ? "toggle-chip is-active" : "toggle-chip"} onClick={() => setStarOnly((current) => !current)}>
-            お気に入りのみ
+            スターのみ
           </button>
         </div>
       </div>
@@ -60,9 +92,15 @@ export function QuestionListPage() {
           const progress = state.progress[question.id];
           const accuracy = progress?.attempts ? Math.round((progress.correctCount / progress.attempts) * 100) : 0;
           const images = getQuestionImages(question);
+          const isHighlighted = routeState.highlightQuestionId === question.id;
 
           return (
-            <article key={question.id} className="panel question-card">
+            <article
+              key={question.id}
+              id={`question-card-${question.id}`}
+              className={isHighlighted ? "panel question-card question-card--highlighted" : "panel question-card"}
+            >
+              {isHighlighted ? <span className="question-card__badge">NEW</span> : null}
               {images[0] ? (
                 <div className="question-card__image-wrap">
                   <img src={images[0].dataUrl} alt="" className="question-card__image" />
@@ -71,30 +109,32 @@ export function QuestionListPage() {
               ) : null}
               <div className="question-card__meta">
                 <span>{question.category}</span>
-                <span>{question.type === "binary" ? "〇×" : "N択"}</span>
+                <span>{question.type === "binary" ? "○×" : "N択"}</span>
               </div>
               <h3>{question.questionText}</h3>
               <div className="question-card__chips">
                 {question.tags.slice(0, 3).map((tag) => (
-                  <span key={tag} className="question-chip">{tag}</span>
+                  <span key={tag} className="question-chip">
+                    {tag}
+                  </span>
                 ))}
               </div>
               <div className="question-card__stats">
                 <span>正答率 {accuracy}%</span>
-                <span>{progress?.lastAnsweredAt ? new Date(progress.lastAnsweredAt).toLocaleDateString("ja-JP") : "未学習"}</span>
+                <span>{progress?.lastAnsweredAt ? new Date(progress.lastAnsweredAt).toLocaleDateString("ja-JP") : "未回答"}</span>
               </div>
               <div className="card-actions">
                 <Link to={`/questions/${question.id}`} className="button-link">
                   編集
                 </Link>
                 <button type="button" className="button-secondary" onClick={() => toggleStar(question.id)}>
-                  {progress?.isStarred ? "重要を外す" : "重要にする"}
+                  {progress?.isStarred ? "スター解除" : "スターにする"}
                 </button>
               </div>
             </article>
           );
         })}
-        {visibleQuestions.length === 0 ? <div className="panel">条件に一致する問題はありません。</div> : null}
+        {visibleQuestions.length === 0 ? <div className="panel">条件に一致する問題がありません。</div> : null}
       </div>
     </section>
   );
