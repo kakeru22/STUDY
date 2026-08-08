@@ -27,6 +27,10 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 const GOOGLE_SCRIPT_ID = "google-gsi-client";
 const DRIVE_AUTH_SESSION_KEY = "drive-auth-session";
 const EXPIRY_BUFFER_MS = 60_000;
+const SNAPSHOT_FOLDER_NAME = "_snapshots";
+const SNAPSHOT_FILE_PREFIX = "snapshot-";
+const SNAPSHOT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
+const SNAPSHOT_MIN_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 type GoogleAuthSession = {
   accessToken: string | null;
@@ -36,6 +40,12 @@ type GoogleAuthSession = {
 type PersistedDriveAuthSession = {
   accessToken: string;
   expiresAt: number;
+};
+
+type DriveFile = {
+  id: string;
+  name: string;
+  modifiedTime?: string;
 };
 
 const session: GoogleAuthSession = {
@@ -175,6 +185,7 @@ function getAccessToken() {
     void deleteValue(DRIVE_AUTH_SESSION_KEY);
     throw new Error("Google Drive 連携が未認証です。");
   }
+
   return session.accessToken!;
 }
 
@@ -195,15 +206,10 @@ async function driveFetch<T>(input: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
-type DriveFile = {
-  id: string;
-  name: string;
-  modifiedTime?: string;
-};
-
-async function findFolderByName(folderName: string): Promise<DriveFile | null> {
+async function findFolderByName(folderName: string, parentId?: string): Promise<DriveFile | null> {
+  const parentClause = parentId ? ` and '${parentId}' in parents` : "";
   const q = encodeURIComponent(
-    `mimeType='application/vnd.google-apps.folder' and name='${folderName.replace(/'/g, "\\'")}' and trashed=false`
+    `mimeType='application/vnd.google-apps.folder' and name='${folderName.replace(/'/g, "\\'")}' and trashed=false${parentClause}`
   );
   const response = await driveFetch<{ files: DriveFile[] }>(
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)`
@@ -211,7 +217,7 @@ async function findFolderByName(folderName: string): Promise<DriveFile | null> {
   return response.files[0] ?? null;
 }
 
-async function createFolder(folderName: string): Promise<DriveFile> {
+async function createFolder(folderName: string, parentId?: string): Promise<DriveFile> {
   return driveFetch<DriveFile>("https://www.googleapis.com/drive/v3/files", {
     method: "POST",
     headers: {
@@ -219,17 +225,18 @@ async function createFolder(folderName: string): Promise<DriveFile> {
     },
     body: JSON.stringify({
       name: folderName,
-      mimeType: "application/vnd.google-apps.folder"
+      mimeType: "application/vnd.google-apps.folder",
+      parents: parentId ? [parentId] : undefined
     })
   });
 }
 
-async function ensureFolder(folderName: string): Promise<DriveFile> {
-  const existing = await findFolderByName(folderName);
+async function ensureFolder(folderName: string, parentId?: string): Promise<DriveFile> {
+  const existing = await findFolderByName(folderName, parentId);
   if (existing) {
     return existing;
   }
-  return createFolder(folderName);
+  return createFolder(folderName, parentId);
 }
 
 async function findFileInFolder(folderId: string, fileName: string): Promise<DriveFile | null> {
@@ -238,6 +245,29 @@ async function findFileInFolder(folderId: string, fileName: string): Promise<Dri
     `https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,modifiedTime)`
   );
   return response.files[0] ?? null;
+}
+
+async function listFilesInFolder(folderId: string, namePrefix?: string): Promise<DriveFile[]> {
+  const prefixClause = namePrefix ? ` and name contains '${namePrefix.replace(/'/g, "\\'")}'` : "";
+  const q = encodeURIComponent(`'${folderId}' in parents and trashed=false${prefixClause}`);
+  const response = await driveFetch<{ files: DriveFile[] }>(
+    `https://www.googleapis.com/drive/v3/files?q=${q}&orderBy=modifiedTime desc&fields=files(id,name,modifiedTime)`
+  );
+  return response.files;
+}
+
+async function deleteDriveFile(fileId: string) {
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${getAccessToken()}`
+    }
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Drive delete error: ${response.status} ${text}`);
+  }
 }
 
 async function uploadJsonFile(folderId: string, fileName: string, payload: unknown) {
@@ -276,6 +306,32 @@ async function uploadJsonFile(folderId: string, fileName: string, payload: unkno
   });
 }
 
+async function createSnapshotIfNeeded(rootFolderId: string, state: PersistedState) {
+  const snapshotFolder = await ensureFolder(SNAPSHOT_FOLDER_NAME, rootFolderId);
+  const existingSnapshots = await listFilesInFolder(snapshotFolder.id, SNAPSHOT_FILE_PREFIX);
+
+  const latestSnapshot = existingSnapshots[0];
+  const latestSnapshotAt = latestSnapshot?.modifiedTime ? new Date(latestSnapshot.modifiedTime).getTime() : 0;
+  const shouldCreateSnapshot = !latestSnapshotAt || Date.now() - latestSnapshotAt >= SNAPSHOT_MIN_INTERVAL_MS;
+
+  if (shouldCreateSnapshot) {
+    const snapshotName = `${SNAPSHOT_FILE_PREFIX}${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
+    await uploadJsonFile(snapshotFolder.id, snapshotName, state);
+  }
+
+  const retentionThreshold = Date.now() - SNAPSHOT_RETENTION_MS;
+  const expiredSnapshots = existingSnapshots.filter((file) => {
+    if (!file.modifiedTime) {
+      return false;
+    }
+    return new Date(file.modifiedTime).getTime() < retentionThreshold;
+  });
+
+  if (expiredSnapshots.length > 0) {
+    await Promise.all(expiredSnapshots.map((file) => deleteDriveFile(file.id)));
+  }
+}
+
 async function downloadJsonFile<T>(folderId: string, fileName: string): Promise<T | null> {
   const file = await findFileInFolder(folderId, fileName);
   if (!file) {
@@ -303,6 +359,8 @@ export async function pushSnapshotToDrive(state: PersistedState, folderName: str
     uploadJsonFile(folder.id, "progress.json", state.progress),
     uploadJsonFile(folder.id, "settings.json", state.settings)
   ]);
+
+  await createSnapshotIfNeeded(folder.id, state);
 
   return folder.id;
 }
