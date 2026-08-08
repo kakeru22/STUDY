@@ -101,12 +101,17 @@ function MainShell() {
 
 export function AppRoutes() {
   const { state } = useAppContext();
+  const isOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
 
   if (!state.isHydrated) {
     return <LoadingShell />;
   }
 
   if (!state.settings.googleClientId.trim()) {
+    return <WelcomeShell />;
+  }
+
+  if (isOffline) {
     return <WelcomeShell />;
   }
 

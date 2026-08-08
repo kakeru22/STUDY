@@ -41,7 +41,7 @@ export function QuestionEditPage() {
   }
 
   function handleDelete() {
-    const confirmed = window.confirm("この問題を完全に削除します。元に戻せません。");
+    const confirmed = window.confirm("この問題を削除します。元に戻せません。");
     if (!confirmed) {
       return;
     }
@@ -81,7 +81,7 @@ export function QuestionEditPage() {
                 <strong>学習状況</strong>
               </div>
             </div>
-            <p className="page-side-panel__lead">{message || "更新すると進捗の見直しにすぐ反映されます。"}</p>
+            <p className="page-side-panel__lead">{message || "更新すると学習の見直しにすぐ反映されます。"}</p>
             <div className="mini-stat-grid">
               <div className="mini-stat">
                 <span>正解</span>
@@ -119,7 +119,7 @@ export function QuestionEditPage() {
                 アーカイブ
               </button>
               <button type="button" className="button-secondary button-danger" onClick={handleDelete}>
-                完全削除
+                削除
               </button>
             </div>
           </section>

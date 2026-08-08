@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 import { getQuestionImages } from "../types/question";
@@ -10,7 +10,8 @@ type ListRouteState = {
 };
 
 export function QuestionListPage() {
-  const { state, toggleStar } = useAppContext();
+  const { state, deleteQuestion, toggleStar } = useAppContext();
+  const navigate = useNavigate();
   const location = useLocation();
   const routeState = (location.state ?? {}) as ListRouteState;
   const [search, setSearch] = useState("");
@@ -50,6 +51,17 @@ export function QuestionListPage() {
       })
       .filter((question) => (starOnly ? state.progress[question.id]?.isStarred : true));
   }, [search, starOnly, state.progress, state.questions, typeFilter]);
+
+  function handleDelete(questionId: string) {
+    const confirmed = window.confirm("この問題を削除します。元に戻せません。");
+    if (!confirmed) {
+      return;
+    }
+
+    deleteQuestion(questionId);
+    setToastMessage("問題を削除しました。");
+    navigate("/questions", { replace: true, state: {} });
+  }
 
   return (
     <section className="page">
@@ -129,6 +141,9 @@ export function QuestionListPage() {
                 </Link>
                 <button type="button" className="button-secondary" onClick={() => toggleStar(question.id)}>
                   {progress?.isStarred ? "スター解除" : "スターにする"}
+                </button>
+                <button type="button" className="button-secondary button-danger" onClick={() => handleDelete(question.id)}>
+                  削除
                 </button>
               </div>
             </article>
