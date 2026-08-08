@@ -1,4 +1,4 @@
-import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
+﻿import { Navigate, NavLink, Route, Routes, useLocation } from "react-router-dom";
 import { AppHeader } from "../components/AppHeader";
 import { AppIcon } from "../components/AppIcon";
 import { SyncBadge } from "../components/SyncBadge";
@@ -100,11 +100,15 @@ function MainShell() {
 }
 
 export function AppRoutes() {
-  const { state } = useAppContext();
+  const { isTemporaryOfflineAccess, state } = useAppContext();
   const isOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
 
   if (!state.isHydrated) {
     return <LoadingShell />;
+  }
+
+  if (isTemporaryOfflineAccess) {
+    return <MainShell />;
   }
 
   if (!state.settings.googleClientId.trim()) {

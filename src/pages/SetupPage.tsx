@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoogleClientIdHelpModal } from "../components/GoogleClientIdHelpModal";
 import { AppIcon } from "../components/AppIcon";
@@ -6,7 +6,7 @@ import { useAppContext } from "../contexts/AppContext";
 
 export function SetupPage() {
   const navigate = useNavigate();
-  const { state, setStartupMode, updateSettings } = useAppContext();
+  const { enterOfflineMode, state, updateSettings } = useAppContext();
   const [clientId, setClientId] = useState(state.settings.googleClientId);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
@@ -16,7 +16,7 @@ export function SetupPage() {
   }
 
   function handleOfflineStart() {
-    setStartupMode("offline");
+    enterOfflineMode();
     navigate("/");
   }
 
@@ -57,7 +57,7 @@ export function SetupPage() {
                 <AppIcon name="offline" className="welcome-option__icon" />
               </span>
               <strong>オフラインで使う</strong>
-              <span>あとで設定</span>
+              <span>この起動中だけ使う</span>
             </button>
           </div>
         </div>

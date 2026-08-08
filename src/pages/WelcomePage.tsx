@@ -1,11 +1,11 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppIcon } from "../components/AppIcon";
 import { useAppContext } from "../contexts/AppContext";
 
 export function WelcomePage() {
   const navigate = useNavigate();
-  const { authorizeGoogleDrive, loadFromDrive, setStartupMode, state } = useAppContext();
+  const { authorizeGoogleDrive, enterOfflineMode, loadFromDrive, state } = useAppContext();
   const [busyMessage, setBusyMessage] = useState("");
 
   async function handleDriveStart() {
@@ -24,7 +24,7 @@ export function WelcomePage() {
   }
 
   function handleOfflineStart() {
-    setStartupMode("offline");
+    enterOfflineMode();
     navigate("/");
   }
 
@@ -40,7 +40,7 @@ export function WelcomePage() {
       <div className="welcome-shell panel">
         <div className="welcome-copy">
           <h2>再ログイン</h2>
-          <p>Google Drive と接続するか、この端末だけで使うかを選べます。</p>
+          <p>Google Drive と接続するか、この起動中だけオフラインで使うかを選べます。</p>
         </div>
 
         <div className="welcome-options">
@@ -56,8 +56,8 @@ export function WelcomePage() {
             <span className="welcome-option__icon-wrap">
               <AppIcon name="offline" className="welcome-option__icon" />
             </span>
-            <strong>この端末だけで使う</strong>
-            <span>オフラインで続ける</span>
+            <strong>オフラインで使う</strong>
+            <span>この起動中だけ使う</span>
           </button>
         </div>
 

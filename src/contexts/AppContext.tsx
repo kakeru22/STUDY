@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   useEffect,
@@ -26,6 +26,7 @@ import type { SyncMode } from "../types/sync";
 
 type AppContextValue = {
   state: AppState;
+  isTemporaryOfflineAccess: boolean;
   addQuestion: (draft: QuestionDraft) => string;
   updateQuestion: (id: string, draft: QuestionDraft) => void;
   deleteQuestion: (id: string) => void;
@@ -35,6 +36,7 @@ type AppContextValue = {
   importSnapshot: (snapshot: PersistedState) => void;
   updateSettings: (patch: Partial<AppSettings>) => void;
   setStartupMode: (mode: AppSettings["startupMode"]) => void;
+  enterOfflineMode: () => void;
   authorizeGoogleDrive: () => Promise<void>;
   syncToDrive: () => Promise<void>;
   loadFromDrive: () => Promise<void>;
@@ -229,6 +231,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [isTemporaryOfflineAccess, setIsTemporaryOfflineAccess] = useState(false);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
   const stateRef = useRef(state);
@@ -423,6 +426,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(() => {
     return {
       state,
+      isTemporaryOfflineAccess,
       addQuestion(draft) {
         const timestamp = new Date().toISOString();
         const id = `q_${Date.now()}`;
@@ -474,7 +478,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setStartupMode(mode) {
         dispatch({ type: "update-settings", payload: { startupMode: mode }, trackDirty: false });
       },
+      enterOfflineMode() {
+        setIsTemporaryOfflineAccess(true);
+      },
       async authorizeGoogleDrive() {
+        setIsTemporaryOfflineAccess(false);
         dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google にログインしています。" } });
         try {
           await requestDriveAccessToken(state.settings.googleClientId);
@@ -506,6 +514,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         await runLoadFromDrive();
       },
       signOutDrive() {
+        setIsTemporaryOfflineAccess(false);
         revokeDriveAccess();
         dispatch({ type: "update-settings", payload: { startupMode: "unset" }, trackDirty: false });
         dispatch({
@@ -521,7 +530,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return toPersistedState(state);
       }
     };
-  }, [state]);
+  }, [isTemporaryOfflineAccess, state]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
