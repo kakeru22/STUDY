@@ -100,10 +100,10 @@ function MainShell() {
 }
 
 export function AppRoutes() {
-  const { isTemporaryOfflineAccess, state } = useAppContext();
+  const { isLaunching, isTemporaryOfflineAccess, state } = useAppContext();
   const isOffline = typeof navigator !== "undefined" ? !navigator.onLine : false;
 
-  if (!state.isHydrated) {
+  if (isLaunching || !state.isHydrated) {
     return <LoadingShell />;
   }
 

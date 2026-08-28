@@ -1,4 +1,4 @@
-﻿import {
+import {
   createContext,
   useContext,
   useEffect,
@@ -26,6 +26,7 @@ import type { SyncMode } from "../types/sync";
 
 type AppContextValue = {
   state: AppState;
+  isLaunching: boolean;
   isTemporaryOfflineAccess: boolean;
   addQuestion: (draft: QuestionDraft) => string;
   updateQuestion: (id: string, draft: QuestionDraft) => void;
@@ -231,6 +232,7 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  const [isLaunching, setIsLaunching] = useState(true);
   const [isTemporaryOfflineAccess, setIsTemporaryOfflineAccess] = useState(false);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
@@ -338,10 +340,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    void Promise.all([loadPersistedState(), hydrateDriveAccessFromStorage()]).then(([persisted, canUseDriveSession]) => {
-      dispatch({
-        type: "hydrate",
-        payload: {
+    let cancelled = false;
+
+    async function initialize() {
+      try {
+        const [persisted, canUseDriveSession] = await Promise.all([loadPersistedState(), hydrateDriveAccessFromStorage()]);
+        if (cancelled) {
+          return;
+        }
+
+        const shouldBootstrapFromDrive =
+          typeof navigator !== "undefined" &&
+          navigator.onLine &&
+          persisted.settings.startupMode === "drive" &&
+          canUseDriveSession;
+
+        const baseState: PersistedState = {
           ...persisted,
           sync: {
             ...persisted.sync,
@@ -349,9 +363,93 @@ export function AppProvider({ children }: { children: ReactNode }) {
             mode: navigator.onLine ? (canUseDriveSession ? "online" : "offline") : "offline",
             statusMessage: canUseDriveSession ? "" : persisted.settings.startupMode === "drive" ? "Google に再ログインしてください。" : ""
           }
+        };
+
+        if (!shouldBootstrapFromDrive) {
+          dispatch({ type: "hydrate", payload: baseState });
+          return;
         }
-      });
-    });
+
+        dispatch({
+          type: "hydrate",
+          payload: {
+            ...baseState,
+            sync: {
+              ...baseState.sync,
+              mode: "syncing",
+              statusMessage: "Drive から最新データを確認しています。"
+            }
+          }
+        });
+
+        try {
+          const result = await pullSnapshotFromDrive(baseState.settings.driveFolderName);
+          if (cancelled) {
+            return;
+          }
+
+          dispatch({
+            type: "replace-state",
+            payload: {
+              questions: result.state.questions ?? baseState.questions,
+              progress: result.state.progress ?? baseState.progress,
+              settings: {
+                ...baseState.settings,
+                ...(result.state.settings ?? {}),
+                driveFolderId: result.folderId
+              },
+              sync: {
+                ...baseState.sync,
+                mode: "online",
+                lastSyncedAt: new Date().toISOString(),
+                unsyncedCount: 0,
+                isAuthorized: true,
+                statusMessage: ""
+              }
+            }
+          });
+        } catch (error) {
+          if (cancelled) {
+            return;
+          }
+
+          if (isAuthorizationError(error)) {
+            revokeDriveAccess();
+            dispatch({
+              type: "hydrate",
+              payload: {
+                ...baseState,
+                sync: {
+                  ...baseState.sync,
+                  mode: "offline",
+                  isAuthorized: false,
+                  statusMessage: "Google に再ログインしてください。"
+                }
+              }
+            });
+          } else {
+            dispatch({ type: "hydrate", payload: baseState });
+            dispatch({
+              type: "set-sync",
+              payload: {
+                mode: "offline",
+                statusMessage: "Drive の確認に失敗したため、ローカルデータで起動しました。"
+              }
+            });
+          }
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLaunching(false);
+        }
+      }
+    }
+
+    void initialize();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -426,6 +524,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AppContextValue>(() => {
     return {
       state,
+      isLaunching,
       isTemporaryOfflineAccess,
       addQuestion(draft) {
         const timestamp = new Date().toISOString();
@@ -530,7 +629,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return toPersistedState(state);
       }
     };
-  }, [isTemporaryOfflineAccess, state]);
+  }, [isLaunching, isTemporaryOfflineAccess, state]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
