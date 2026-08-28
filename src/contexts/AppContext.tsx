@@ -1,4 +1,4 @@
-import {
+﻿import {
   createContext,
   useContext,
   useEffect,
@@ -9,9 +9,10 @@ import {
   type ReactNode
 } from "react";
 import { seedState } from "../data/seed";
-import { loadPersistedState, savePersistedState } from "../services/storage/appStateRepository";
 import { calculateNextReviewDate } from "../services/review/reviewScheduler";
+import { loadPersistedState, savePersistedState } from "../services/storage/appStateRepository";
 import {
+  getDriveSnapshotStatus,
   hasDriveAccessToken,
   hydrateDriveAccessFromStorage,
   pullSnapshotFromDrive,
@@ -82,8 +83,9 @@ function markDirty(sync: AppState["sync"], statusMessage = "ローカル変更�
 function isAuthorizationError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
   return (
-    message.includes("Google Drive 連携が未認証") ||
-    message.includes("Google Client ID が未設定") ||
+    message.includes("Google Drive access is not authorized") ||
+    message.includes("Google Drive") ||
+    message.includes("Google Client ID") ||
     message.includes("access_denied") ||
     message.includes("invalid_grant") ||
     message.includes("401")
@@ -229,11 +231,43 @@ function reducer(state: AppState, action: Action): AppState {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+function mergeDriveState(baseState: PersistedState, driveState: Partial<PersistedState>, folderId: string, hasSnapshot: boolean): PersistedState {
+  return {
+    questions: driveState.questions ?? baseState.questions,
+    progress: driveState.progress ?? baseState.progress,
+    settings: {
+      ...baseState.settings,
+      driveFolderId: folderId
+    },
+    sync: {
+      ...baseState.sync,
+      mode: typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline",
+      lastSyncedAt: new Date().toISOString(),
+      unsyncedCount: hasSnapshot ? 0 : baseState.sync.unsyncedCount,
+      isAuthorized: true,
+      statusMessage: hasSnapshot ? "" : "Drive に既存データがないため、ローカルデータを使っています。"
+    }
+  };
+}
+
+function isRemoteNewerThanLocal(latestModifiedAt: string | null, lastSyncedAt: string | null) {
+  if (!latestModifiedAt) {
+    return false;
+  }
+
+  if (!lastSyncedAt) {
+    return true;
+  }
+
+  return new Date(latestModifiedAt).getTime() > new Date(lastSyncedAt).getTime();
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [isLaunching, setIsLaunching] = useState(true);
   const [isTemporaryOfflineAccess, setIsTemporaryOfflineAccess] = useState(false);
+  const [hasBootstrappedDriveSession, setHasBootstrappedDriveSession] = useState(false);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
   const stateRef = useRef(state);
@@ -243,9 +277,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   async function runSync(snapshot = toPersistedState(stateRef.current)) {
-    dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive に同期しています。" } });
+    dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive に同期しています..." } });
 
     try {
+      const remoteStatus = await getDriveSnapshotStatus(snapshot.settings.driveFolderName);
+      const remoteIsNewer = isRemoteNewerThanLocal(remoteStatus.latestModifiedAt, snapshot.sync.lastSyncedAt);
+
+      if (remoteStatus.hasSnapshot && remoteIsNewer && typeof window !== "undefined") {
+        const confirmed = window.confirm("別の端末で更新されたデータがあります。この端末のデータでアップロードデータを上書きしますか？");
+        if (!confirmed) {
+          dispatch({
+            type: "set-sync",
+            payload: {
+              mode: "conflict",
+              statusMessage: "Drive 側の更新を確認してください。"
+            }
+          });
+          return;
+        }
+      }
+
       const folderId = await pushSnapshotToDrive(snapshot, snapshot.settings.driveFolderName);
       dispatch({
         type: "replace-state",
@@ -268,12 +319,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       if (isAuthorizationError(error)) {
         revokeDriveAccess();
+        setHasBootstrappedDriveSession(false);
         dispatch({
           type: "set-sync",
           payload: {
             mode: "offline",
             isAuthorized: false,
-            statusMessage: "Google の認証が切れました。もう一度ログインしてください。"
+            statusMessage: "Google に再ログインしてください。"
           }
         });
       } else {
@@ -281,7 +333,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: "set-sync",
           payload: {
             mode: "offline",
-            statusMessage: "同期できませんでした。オフラインモードに切り替えました。"
+            statusMessage: "同期に失敗したため、オフラインモードへ切り替えました。"
           }
         });
       }
@@ -290,40 +342,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function runLoadFromDrive() {
-    dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive から読み込んでいます。" } });
+    dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive から読み込んでいます..." } });
 
     try {
       const currentState = stateRef.current;
+      const remoteStatus = await getDriveSnapshotStatus(currentState.settings.driveFolderName);
+      const remoteIsNewer = isRemoteNewerThanLocal(remoteStatus.latestModifiedAt, currentState.sync.lastSyncedAt);
+      const shouldConfirmOverwriteLocal =
+        remoteStatus.hasSnapshot && remoteIsNewer && currentState.sync.unsyncedCount > 0 && typeof window !== "undefined";
+
+      if (shouldConfirmOverwriteLocal) {
+        const confirmed = window.confirm("別の端末で更新されたデータがあります。アップロードデータでこの端末のデータを上書きしますか？");
+        if (!confirmed) {
+          dispatch({
+            type: "set-sync",
+            payload: {
+              mode: "conflict",
+              statusMessage: "この端末の変更を残しています。必要なら手動で同期してください。"
+            }
+          });
+          return;
+        }
+      }
+
       const result = await pullSnapshotFromDrive(currentState.settings.driveFolderName);
+      setHasBootstrappedDriveSession(true);
       dispatch({
         type: "replace-state",
-        payload: {
-          questions: result.state.questions ?? currentState.questions,
-          progress: result.state.progress ?? currentState.progress,
-          settings: {
-            ...currentState.settings,
-            ...(result.state.settings ?? {}),
-            driveFolderId: result.folderId
-          },
-          sync: {
-            ...currentState.sync,
-            mode: navigator.onLine ? "online" : "offline",
-            lastSyncedAt: new Date().toISOString(),
-            unsyncedCount: 0,
-            isAuthorized: true,
-            statusMessage: ""
-          }
-        }
+        payload: mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot)
       });
     } catch (error) {
       if (isAuthorizationError(error)) {
         revokeDriveAccess();
+        setHasBootstrappedDriveSession(false);
         dispatch({
           type: "set-sync",
           payload: {
             mode: "offline",
             isAuthorized: false,
-            statusMessage: "Google の認証が切れました。もう一度ログインしてください。"
+            statusMessage: "Google に再ログインしてください。"
           }
         });
       } else {
@@ -331,7 +388,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           type: "set-sync",
           payload: {
             mode: "offline",
-            statusMessage: "Drive を読み込めませんでした。オフラインモードに切り替えました。"
+            statusMessage: "Drive の読み込みに失敗したため、ローカルデータを使います。"
           }
         });
       }
@@ -344,6 +401,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     async function initialize() {
       try {
+        setHasBootstrappedDriveSession(false);
         const [persisted, canUseDriveSession] = await Promise.all([loadPersistedState(), hydrateDriveAccessFromStorage()]);
         if (cancelled) {
           return;
@@ -388,25 +446,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             return;
           }
 
+          setHasBootstrappedDriveSession(true);
           dispatch({
             type: "replace-state",
-            payload: {
-              questions: result.state.questions ?? baseState.questions,
-              progress: result.state.progress ?? baseState.progress,
-              settings: {
-                ...baseState.settings,
-                ...(result.state.settings ?? {}),
-                driveFolderId: result.folderId
-              },
-              sync: {
-                ...baseState.sync,
-                mode: "online",
-                lastSyncedAt: new Date().toISOString(),
-                unsyncedCount: 0,
-                isAuthorized: true,
-                statusMessage: ""
-              }
-            }
+            payload: mergeDriveState(baseState, result.state, result.folderId, result.hasSnapshot)
           });
         } catch (error) {
           if (cancelled) {
@@ -415,6 +458,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           if (isAuthorizationError(error)) {
             revokeDriveAccess();
+            setHasBootstrappedDriveSession(false);
             dispatch({
               type: "hydrate",
               payload: {
@@ -500,7 +544,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (state.sync.unsyncedCount <= 0 || state.sync.mode === "syncing" || !hasDriveAccessToken()) {
+    if (
+      !hasBootstrappedDriveSession ||
+      state.sync.unsyncedCount <= 0 ||
+      state.sync.mode === "syncing" ||
+      state.sync.mode === "conflict" ||
+      !hasDriveAccessToken()
+    ) {
       return;
     }
 
@@ -519,7 +569,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         autoSyncTimerRef.current = null;
       }
     };
-  }, [isOnline, state.isHydrated, state.settings.startupMode, state.sync.isAuthorized, state.sync.mode, state.sync.unsyncedCount]);
+  }, [
+    hasBootstrappedDriveSession,
+    isOnline,
+    state.isHydrated,
+    state.settings.startupMode,
+    state.sync.isAuthorized,
+    state.sync.mode,
+    state.sync.unsyncedCount
+  ]);
 
   const value = useMemo<AppContextValue>(() => {
     return {
@@ -582,19 +640,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       async authorizeGoogleDrive() {
         setIsTemporaryOfflineAccess(false);
-        dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google にログインしています。" } });
+        dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google にログインしています..." } });
         try {
           await requestDriveAccessToken(state.settings.googleClientId);
           dispatch({ type: "update-settings", payload: { startupMode: "drive" }, trackDirty: false });
-          dispatch({
-            type: "set-sync",
-            payload: {
-              mode: navigator.onLine ? "online" : "offline",
-              isAuthorized: true,
-              statusMessage: ""
-            }
-          });
+          await runLoadFromDrive();
         } catch (error) {
+          setHasBootstrappedDriveSession(false);
           dispatch({
             type: "set-sync",
             payload: {
@@ -614,6 +666,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },
       signOutDrive() {
         setIsTemporaryOfflineAccess(false);
+        setHasBootstrappedDriveSession(false);
         revokeDriveAccess();
         dispatch({ type: "update-settings", payload: { startupMode: "unset" }, trackDirty: false });
         dispatch({

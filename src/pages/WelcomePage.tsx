@@ -5,18 +5,13 @@ import { useAppContext } from "../contexts/AppContext";
 
 export function WelcomePage() {
   const navigate = useNavigate();
-  const { authorizeGoogleDrive, enterOfflineMode, loadFromDrive, state } = useAppContext();
+  const { authorizeGoogleDrive, enterOfflineMode, state } = useAppContext();
   const [busyMessage, setBusyMessage] = useState("");
 
   async function handleDriveStart() {
     setBusyMessage("Google Drive に接続しています...");
     try {
       await authorizeGoogleDrive();
-      try {
-        await loadFromDrive();
-      } catch {
-        // First-time users may not have a Drive snapshot yet.
-      }
       navigate("/");
     } catch (error) {
       setBusyMessage(error instanceof Error ? error.message : "ログインに失敗しました。");

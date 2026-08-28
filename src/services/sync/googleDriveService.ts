@@ -48,6 +48,12 @@ type DriveFile = {
   modifiedTime?: string;
 };
 
+export type DriveSnapshotStatus = {
+  folderId: string;
+  hasSnapshot: boolean;
+  latestModifiedAt: string | null;
+};
+
 const session: GoogleAuthSession = {
   accessToken: null,
   expiresAt: null
@@ -351,13 +357,29 @@ async function downloadJsonFile<T>(folderId: string, fileName: string): Promise<
   return (await response.json()) as T;
 }
 
+export async function getDriveSnapshotStatus(folderName: string): Promise<DriveSnapshotStatus> {
+  const folder = await ensureFolder(folderName);
+  const [questionsFile, progressFile] = await Promise.all([
+    findFileInFolder(folder.id, "questions.json"),
+    findFileInFolder(folder.id, "progress.json")
+  ]);
+
+  const modifiedTimes = [questionsFile?.modifiedTime, progressFile?.modifiedTime].filter((value): value is string => Boolean(value));
+  const latestModifiedAt = modifiedTimes.length > 0 ? modifiedTimes.sort().at(-1)! : null;
+
+  return {
+    folderId: folder.id,
+    hasSnapshot: Boolean(questionsFile || progressFile),
+    latestModifiedAt
+  };
+}
+
 export async function pushSnapshotToDrive(state: PersistedState, folderName: string) {
   const folder = await ensureFolder(folderName);
 
   await Promise.all([
     uploadJsonFile(folder.id, "questions.json", state.questions),
-    uploadJsonFile(folder.id, "progress.json", state.progress),
-    uploadJsonFile(folder.id, "settings.json", state.settings)
+    uploadJsonFile(folder.id, "progress.json", state.progress)
   ]);
 
   await createSnapshotIfNeeded(folder.id, state);
@@ -367,22 +389,22 @@ export async function pushSnapshotToDrive(state: PersistedState, folderName: str
 
 export async function pullSnapshotFromDrive(folderName: string): Promise<{
   folderId: string;
+  hasSnapshot: boolean;
   state: Partial<PersistedState>;
 }> {
   const folder = await ensureFolder(folderName);
 
-  const [questions, progress, settings] = await Promise.all([
+  const [questions, progress] = await Promise.all([
     downloadJsonFile<PersistedState["questions"]>(folder.id, "questions.json"),
-    downloadJsonFile<PersistedState["progress"]>(folder.id, "progress.json"),
-    downloadJsonFile<PersistedState["settings"]>(folder.id, "settings.json")
+    downloadJsonFile<PersistedState["progress"]>(folder.id, "progress.json")
   ]);
 
   return {
     folderId: folder.id,
+    hasSnapshot: questions !== null || progress !== null,
     state: {
       questions: questions ?? undefined,
-      progress: progress ?? undefined,
-      settings: settings ?? undefined
+      progress: progress ?? undefined
     }
   };
 }
