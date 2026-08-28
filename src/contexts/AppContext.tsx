@@ -231,12 +231,19 @@ function reducer(state: AppState, action: Action): AppState {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-function mergeDriveState(baseState: PersistedState, driveState: Partial<PersistedState>, folderId: string, hasSnapshot: boolean): PersistedState {
+function mergeDriveState(
+  baseState: PersistedState,
+  driveState: Partial<PersistedState>,
+  folderId: string,
+  hasSnapshot: boolean,
+  settingsPatch: Partial<AppSettings> = {}
+): PersistedState {
   return {
     questions: driveState.questions ?? baseState.questions,
     progress: driveState.progress ?? baseState.progress,
     settings: {
       ...baseState.settings,
+      ...settingsPatch,
       driveFolderId: folderId
     },
     sync: {
@@ -341,12 +348,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function runLoadFromDrive() {
+  async function runLoadFromDrive(settingsPatch: Partial<AppSettings> = {}) {
     dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive から読み込んでいます..." } });
 
     try {
       const currentState = stateRef.current;
-      const remoteStatus = await getDriveSnapshotStatus(currentState.settings.driveFolderName);
+      const effectiveSettings = {
+        ...currentState.settings,
+        ...settingsPatch
+      };
+      const remoteStatus = await getDriveSnapshotStatus(effectiveSettings.driveFolderName);
       const remoteIsNewer = isRemoteNewerThanLocal(remoteStatus.latestModifiedAt, currentState.sync.lastSyncedAt);
       const shouldConfirmOverwriteLocal =
         remoteStatus.hasSnapshot && remoteIsNewer && currentState.sync.unsyncedCount > 0 && typeof window !== "undefined";
@@ -365,11 +376,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const result = await pullSnapshotFromDrive(currentState.settings.driveFolderName);
+      const result = await pullSnapshotFromDrive(effectiveSettings.driveFolderName);
       setHasBootstrappedDriveSession(true);
       dispatch({
         type: "replace-state",
-        payload: mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot)
+        payload: mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot, settingsPatch)
       });
     } catch (error) {
       if (isAuthorizationError(error)) {
@@ -643,8 +654,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Google にログインしています..." } });
         try {
           await requestDriveAccessToken(state.settings.googleClientId);
-          dispatch({ type: "update-settings", payload: { startupMode: "drive" }, trackDirty: false });
-          await runLoadFromDrive();
+          const nextSettings = { startupMode: "drive" as const };
+          dispatch({ type: "update-settings", payload: nextSettings, trackDirty: false });
+          await runLoadFromDrive(nextSettings);
         } catch (error) {
           setHasBootstrappedDriveSession(false);
           dispatch({
