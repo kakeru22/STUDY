@@ -123,8 +123,12 @@ export function AppRoutes() {
     return <WelcomeShell />;
   }
 
-  if (state.settings.startupMode === "drive" && !state.sync.isAuthorized && state.sync.mode === "syncing") {
-    return <LoadingShell />;
+  if (state.settings.startupMode === "drive" && !state.sync.isAuthorized) {
+    if (state.sync.mode === "syncing") {
+      return <LoadingShell />;
+    }
+
+    return <WelcomeShell />;
   }
 
   return <MainShell />;
