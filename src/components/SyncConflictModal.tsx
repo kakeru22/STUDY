@@ -33,7 +33,7 @@ export function SyncConflictModal({ conflict, onChooseLocal, onChooseCloud }: Sy
         <div className="help-modal__header">
           <div>
             <p className="section-title">Sync Conflict</p>
-            <h3 id="sync-conflict-title">同期する基準を選択</h3>
+            <h3 id="sync-conflict-title">同期の基準を選択</h3>
           </div>
         </div>
 

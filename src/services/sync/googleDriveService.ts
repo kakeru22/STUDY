@@ -135,7 +135,7 @@ function waitForGoogle(): Promise<void> {
 
       if (Date.now() - startedAt > 10000) {
         window.clearInterval(timer);
-        reject(new Error("Google Identity Services の起動がタイムアウトしました。"));
+        reject(new Error("Google Identity Services の初期化がタイムアウトしました。"));
       }
     }, 100);
   });
@@ -185,11 +185,11 @@ export function revokeDriveAccess() {
 }
 
 function getAccessToken() {
-  if (!hasDriveAccessToken()) {
+  if (!isSessionValid(session.accessToken, session.expiresAt)) {
     session.accessToken = null;
     session.expiresAt = null;
     void deleteValue(DRIVE_AUTH_SESSION_KEY);
-    throw new Error("Google Drive 連携が未認証です。");
+    throw new Error("Google Drive access is not authorized.");
   }
 
   return session.accessToken!;

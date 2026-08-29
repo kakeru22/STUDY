@@ -1,31 +1,50 @@
 # AnkiSoft
 
-個人用の一問一答復習アプリです。
+一問一答の復習用アプリです。
 
-## 公開URL
+公開版:
 
 - `https://archistudy.netlify.app/`
 
+ローカルPC版:
+
+- `http://127.0.0.1:4174` で起動
+
+## 構成
+
+- `公開版`: Netlify で公開。スマホや別PCから利用
+- `ローカルPC版`: localhost で起動。PC用に直接利用
+- `同期先`: Google Drive
+
 ## 主な機能
 
-- オフライン利用
+- オフライン起動
 - Google Drive 同期
-- ○× / N択の問題管理
-- 画像付き問題の登録
-- PWA 対応
+- 〇× / N択問題
+- 画像付き問題
+- 競合検知と解決
+- 7日保持の自動スナップショット
 
-## 公開前提
+## コマンド
 
-- 公開先は `Netlify`
-- Google 認証は `Google Identity Services` のポップアップ方式
-- Google Cloud では `Google Drive API` と `OAuth クライアント ID` の設定が必要
+公開版 / 共通開発:
 
-## Google Cloud 設定で使うURL
+```bash
+npm run dev
+npm run build
+npm run preview
+```
 
-- 承認済みの JavaScript 生成元: `https://archistudy.netlify.app`
-- リダイレクト URI: 通常は不要
+ローカルPC版:
 
-## 補助ドキュメント
+```bash
+npm run local:dev
+npm run local:start
+```
 
-- [Netlify 公開手順](C:\Users\PC-G2\STUDY\NETLIFY-DEPLOY.md)
-- [Google Drive 設定](C:\Users\PC-G2\STUDY\GOOGLE-DRIVE-SETUP.md)
+## ドキュメント
+
+- `NETLIFY-DEPLOY.md`
+- `GOOGLE-DRIVE-SETUP.md`
+- `LOCAL-DESKTOP-SETUP.md`
+- `GOOGLE-OAUTH-CLIENTS.md`
