@@ -8,6 +8,7 @@
   useState,
   type ReactNode
 } from "react";
+import { SyncConflictModal } from "../components/SyncConflictModal";
 import { seedState } from "../data/seed";
 import { calculateNextReviewDate } from "../services/review/reviewScheduler";
 import { loadPersistedState, savePersistedState } from "../services/storage/appStateRepository";
@@ -44,6 +45,12 @@ type AppContextValue = {
   loadFromDrive: () => Promise<void>;
   signOutDrive: () => void;
   exportSnapshot: () => PersistedState;
+};
+
+type PendingSyncConflict = {
+  localState: PersistedState;
+  remoteState: PersistedState;
+  remoteModifiedAt: string | null;
 };
 
 type Action =
@@ -90,6 +97,17 @@ function isAuthorizationError(error: unknown) {
     message.includes("invalid_grant") ||
     message.includes("401")
   );
+}
+
+function normalizeComparableState(state: PersistedState) {
+  return {
+    questions: state.questions,
+    progress: Object.fromEntries(Object.entries(state.progress).sort(([a], [b]) => a.localeCompare(b)))
+  };
+}
+
+function statesDiffer(localState: PersistedState, remoteState: PersistedState) {
+  return JSON.stringify(normalizeComparableState(localState)) !== JSON.stringify(normalizeComparableState(remoteState));
 }
 
 function reducer(state: AppState, action: Action): AppState {
@@ -257,24 +275,13 @@ function mergeDriveState(
   };
 }
 
-function isRemoteNewerThanLocal(latestModifiedAt: string | null, lastSyncedAt: string | null) {
-  if (!latestModifiedAt) {
-    return false;
-  }
-
-  if (!lastSyncedAt) {
-    return true;
-  }
-
-  return new Date(latestModifiedAt).getTime() > new Date(lastSyncedAt).getTime();
-}
-
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [isLaunching, setIsLaunching] = useState(true);
   const [isTemporaryOfflineAccess, setIsTemporaryOfflineAccess] = useState(false);
   const [hasBootstrappedDriveSession, setHasBootstrappedDriveSession] = useState(false);
+  const [pendingSyncConflict, setPendingSyncConflict] = useState<PendingSyncConflict | null>(null);
   const isFirstSave = useRef(true);
   const autoSyncTimerRef = useRef<number | null>(null);
   const stateRef = useRef(state);
@@ -283,28 +290,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
     stateRef.current = state;
   }, [state]);
 
-  async function runSync(snapshot = toPersistedState(stateRef.current)) {
+  function openSyncConflict(localState: PersistedState, remoteState: PersistedState, remoteModifiedAt: string | null) {
+    setPendingSyncConflict({ localState, remoteState, remoteModifiedAt });
+    dispatch({
+      type: "set-sync",
+      payload: {
+        mode: "conflict",
+        isAuthorized: true,
+        statusMessage: "ローカルとクラウドの内容が一致しません。どちらに合わせるか選んでください。"
+      }
+    });
+  }
+
+  async function runSync(snapshot = toPersistedState(stateRef.current), options?: { skipConflictCheck?: boolean }) {
     dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive に同期しています..." } });
 
     try {
-      const remoteStatus = await getDriveSnapshotStatus(snapshot.settings.driveFolderName);
-      const remoteIsNewer = isRemoteNewerThanLocal(remoteStatus.latestModifiedAt, snapshot.sync.lastSyncedAt);
-
-      if (remoteStatus.hasSnapshot && remoteIsNewer && typeof window !== "undefined") {
-        const confirmed = window.confirm("別の端末で更新されたデータがあります。この端末のデータでアップロードデータを上書きしますか？");
-        if (!confirmed) {
-          dispatch({
-            type: "set-sync",
-            payload: {
-              mode: "conflict",
-              statusMessage: "Drive 側の更新を確認してください。"
-            }
+      if (!options?.skipConflictCheck) {
+        const remoteStatus = await getDriveSnapshotStatus(snapshot.settings.driveFolderName);
+        if (remoteStatus.hasSnapshot) {
+          const remoteResult = await pullSnapshotFromDrive(snapshot.settings.driveFolderName);
+          const remoteState = mergeDriveState(snapshot, remoteResult.state, remoteResult.folderId, remoteResult.hasSnapshot, {
+            startupMode: snapshot.settings.startupMode,
+            googleClientId: snapshot.settings.googleClientId,
+            driveFolderName: snapshot.settings.driveFolderName
           });
-          return;
+
+          if (statesDiffer(snapshot, remoteState)) {
+            openSyncConflict(snapshot, remoteState, remoteStatus.latestModifiedAt);
+            return;
+          }
         }
       }
 
       const folderId = await pushSnapshotToDrive(snapshot, snapshot.settings.driveFolderName);
+      setPendingSyncConflict(null);
+      setHasBootstrappedDriveSession(true);
       dispatch({
         type: "replace-state",
         payload: {
@@ -348,7 +369,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function runLoadFromDrive(settingsPatch: Partial<AppSettings> = {}) {
+  async function runLoadFromDrive(settingsPatch: Partial<AppSettings> = {}, options?: { skipConflictCheck?: boolean }) {
     dispatch({ type: "set-sync", payload: { mode: "syncing", statusMessage: "Drive から読み込んでいます..." } });
 
     try {
@@ -358,29 +379,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ...settingsPatch
       };
       const remoteStatus = await getDriveSnapshotStatus(effectiveSettings.driveFolderName);
-      const remoteIsNewer = isRemoteNewerThanLocal(remoteStatus.latestModifiedAt, currentState.sync.lastSyncedAt);
-      const shouldConfirmOverwriteLocal =
-        remoteStatus.hasSnapshot && remoteIsNewer && currentState.sync.unsyncedCount > 0 && typeof window !== "undefined";
+      const result = await pullSnapshotFromDrive(effectiveSettings.driveFolderName);
+      const remoteState = mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot, settingsPatch);
 
-      if (shouldConfirmOverwriteLocal) {
-        const confirmed = window.confirm("別の端末で更新されたデータがあります。アップロードデータでこの端末のデータを上書きしますか？");
-        if (!confirmed) {
-          dispatch({
-            type: "set-sync",
-            payload: {
-              mode: "conflict",
-              statusMessage: "この端末の変更を残しています。必要なら手動で同期してください。"
-            }
-          });
-          return;
-        }
+      if (!options?.skipConflictCheck && remoteStatus.hasSnapshot && statesDiffer(currentState, remoteState)) {
+        openSyncConflict(currentState, remoteState, remoteStatus.latestModifiedAt);
+        return;
       }
 
-      const result = await pullSnapshotFromDrive(effectiveSettings.driveFolderName);
+      setPendingSyncConflict(null);
       setHasBootstrappedDriveSession(true);
       dispatch({
         type: "replace-state",
-        payload: mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot, settingsPatch)
+        payload: remoteState
       });
     } catch (error) {
       if (isAuthorizationError(error)) {
@@ -405,6 +416,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       throw error;
     }
+  }
+
+  async function resolveSyncConflict(target: "local" | "cloud") {
+    if (!pendingSyncConflict) {
+      return;
+    }
+
+    const conflict = pendingSyncConflict;
+    setPendingSyncConflict(null);
+
+    if (target === "local") {
+      await runSync(conflict.localState, { skipConflictCheck: true });
+      return;
+    }
+
+    setHasBootstrappedDriveSession(true);
+    dispatch({
+      type: "replace-state",
+      payload: {
+        ...conflict.remoteState,
+        sync: {
+          ...conflict.remoteState.sync,
+          mode: navigator.onLine ? "online" : "offline",
+          unsyncedCount: 0,
+          isAuthorized: true,
+          statusMessage: ""
+        }
+      }
+    });
   }
 
   useEffect(() => {
@@ -452,15 +492,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
 
         try {
+          const remoteStatus = await getDriveSnapshotStatus(baseState.settings.driveFolderName);
           const result = await pullSnapshotFromDrive(baseState.settings.driveFolderName);
           if (cancelled) {
             return;
           }
 
+          const remoteState = mergeDriveState(baseState, result.state, result.folderId, result.hasSnapshot);
+
+          if (remoteStatus.hasSnapshot && statesDiffer(baseState, remoteState)) {
+            openSyncConflict(baseState, remoteState, remoteStatus.latestModifiedAt);
+            dispatch({
+              type: "hydrate",
+              payload: {
+                ...baseState,
+                sync: {
+                  ...baseState.sync,
+                  mode: "conflict",
+                  isAuthorized: true,
+                  statusMessage: "ローカルとクラウドの内容が一致しません。どちらに合わせるか選んでください。"
+                }
+              }
+            });
+            return;
+          }
+
+          setPendingSyncConflict(null);
           setHasBootstrappedDriveSession(true);
           dispatch({
             type: "replace-state",
-            payload: mergeDriveState(baseState, result.state, result.folderId, result.hasSnapshot)
+            payload: remoteState
           });
         } catch (error) {
           if (cancelled) {
@@ -526,7 +587,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
 
     const nextMode: SyncMode = isOnline ? (state.sync.isAuthorized ? "online" : "offline") : "offline";
-    if (state.sync.mode !== nextMode) {
+    if (state.sync.mode !== nextMode && state.sync.mode !== "conflict") {
       dispatch({
         type: "set-sync",
         payload: {
@@ -557,6 +618,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     if (
       !hasBootstrappedDriveSession ||
+      pendingSyncConflict ||
       state.sync.unsyncedCount <= 0 ||
       state.sync.mode === "syncing" ||
       state.sync.mode === "conflict" ||
@@ -583,6 +645,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [
     hasBootstrappedDriveSession,
     isOnline,
+    pendingSyncConflict,
     state.isHydrated,
     state.settings.startupMode,
     state.sync.isAuthorized,
@@ -679,6 +742,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       signOutDrive() {
         setIsTemporaryOfflineAccess(false);
         setHasBootstrappedDriveSession(false);
+        setPendingSyncConflict(null);
         revokeDriveAccess();
         dispatch({ type: "update-settings", payload: { startupMode: "unset" }, trackDirty: false });
         dispatch({
@@ -696,7 +760,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, [isLaunching, isTemporaryOfflineAccess, state]);
 
-  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
+  return (
+    <>
+      <AppContext.Provider value={value}>{children}</AppContext.Provider>
+      <SyncConflictModal
+        conflict={pendingSyncConflict}
+        onChooseCloud={() => {
+          void resolveSyncConflict("cloud");
+        }}
+        onChooseLocal={() => {
+          void resolveSyncConflict("local");
+        }}
+      />
+    </>
+  );
 }
 
 export function useAppContext() {

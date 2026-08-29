@@ -627,6 +627,58 @@ select {
   color: var(--muted);
 }
 
+.sync-conflict-modal {
+  max-width: 42rem;
+}
+
+.sync-conflict-modal__lead {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.sync-conflict-modal__grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.sync-conflict-modal__choice {
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+  text-align: left;
+  border-radius: 18px;
+  border: 1px solid rgba(214, 194, 164, 0.58);
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--ink);
+}
+
+.sync-conflict-modal__choice strong {
+  font-size: 1rem;
+}
+
+.sync-conflict-modal__choice span:last-child,
+.sync-conflict-modal__eyebrow {
+  color: var(--muted);
+}
+
+.sync-conflict-modal__choice--primary {
+  background: linear-gradient(180deg, rgba(135, 122, 242, 0.96) 0%, rgba(93, 82, 179, 0.98) 100%);
+  border-color: transparent;
+  color: white;
+}
+
+.sync-conflict-modal__choice--primary span:last-child,
+.sync-conflict-modal__choice--primary .sync-conflict-modal__eyebrow {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.sync-conflict-modal__meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
 .page-heading h2 {
   margin-top: 0.2rem;
   font-size: clamp(1.5rem, 4vw, 2.2rem);
