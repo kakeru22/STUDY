@@ -11,7 +11,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "local:dev": "vite --host 127.0.0.1 --port 4174",
-    "local:start": "npm run build && vite preview --host 127.0.0.1 --port 4174"
+    "local:start": "npm run build && vite preview --host 127.0.0.1 --port 4174",
+    "local:serve": "vite preview --host 127.0.0.1 --port 4174"
   },
   "dependencies": {
     "react": "^19.1.0",
