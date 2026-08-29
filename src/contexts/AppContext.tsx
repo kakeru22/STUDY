@@ -110,6 +110,14 @@ function statesDiffer(localState: PersistedState, remoteState: PersistedState) {
   return JSON.stringify(normalizeComparableState(localState)) !== JSON.stringify(normalizeComparableState(remoteState));
 }
 
+function hasRemoteChangedSinceLastSync(lastSyncedAt: string | null, remoteModifiedAt: string | null) {
+  if (!lastSyncedAt || !remoteModifiedAt) {
+    return Boolean(remoteModifiedAt);
+  }
+
+  return new Date(remoteModifiedAt).getTime() > new Date(lastSyncedAt).getTime();
+}
+
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case "hydrate":
@@ -316,7 +324,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             driveFolderName: snapshot.settings.driveFolderName
           });
 
-          if (statesDiffer(snapshot, remoteState)) {
+          if (hasRemoteChangedSinceLastSync(snapshot.sync.lastSyncedAt, remoteStatus.latestModifiedAt) && statesDiffer(snapshot, remoteState)) {
             openSyncConflict(snapshot, remoteState, remoteStatus.latestModifiedAt);
             return;
           }
@@ -382,7 +390,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const result = await pullSnapshotFromDrive(effectiveSettings.driveFolderName);
       const remoteState = mergeDriveState(currentState, result.state, result.folderId, result.hasSnapshot, settingsPatch);
 
-      if (!options?.skipConflictCheck && remoteStatus.hasSnapshot && statesDiffer(currentState, remoteState)) {
+      if (
+        !options?.skipConflictCheck &&
+        remoteStatus.hasSnapshot &&
+        hasRemoteChangedSinceLastSync(currentState.sync.lastSyncedAt, remoteStatus.latestModifiedAt) &&
+        statesDiffer(currentState, remoteState)
+      ) {
         openSyncConflict(currentState, remoteState, remoteStatus.latestModifiedAt);
         return;
       }
@@ -500,7 +513,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           const remoteState = mergeDriveState(baseState, result.state, result.folderId, result.hasSnapshot);
 
-          if (remoteStatus.hasSnapshot && statesDiffer(baseState, remoteState)) {
+          if (
+            remoteStatus.hasSnapshot &&
+            hasRemoteChangedSinceLastSync(baseState.sync.lastSyncedAt, remoteStatus.latestModifiedAt) &&
+            statesDiffer(baseState, remoteState)
+          ) {
             openSyncConflict(baseState, remoteState, remoteStatus.latestModifiedAt);
             dispatch({
               type: "hydrate",
