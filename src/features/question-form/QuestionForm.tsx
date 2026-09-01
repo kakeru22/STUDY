@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type CompositionEvent, type FormEvent } from "react";
 import { AppIcon } from "../../components/AppIcon";
 import { useQuestionForm } from "../../hooks/useQuestionForm";
 import { createInitialQuestionDraft, type QuestionDraft, type QuestionImage } from "../../types/question";
@@ -10,6 +10,8 @@ type QuestionFormProps = {
   onSubmitAndExit?: (draft: QuestionDraft) => Promise<void> | void;
   onSaveDraft?: (draft: QuestionDraft) => Promise<void> | void;
 };
+
+type TextField = "category" | "questionText" | "explanation" | "source";
 
 const suggestedTags = ["スター", "頻出", "暗記", "基本", "要復習"];
 
@@ -52,6 +54,7 @@ async function fileToCompressedDataUrl(file: File) {
 
 export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, onSaveDraft }: QuestionFormProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const composingFieldsRef = useRef(new Set<string>());
   const [notice, setNotice] = useState<{
     type: "error";
     title: string;
@@ -68,6 +71,34 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
     const timer = window.setTimeout(() => setNotice(null), 4200);
     return () => window.clearTimeout(timer);
   }, [notice]);
+
+  function startComposition(field: string) {
+    composingFieldsRef.current.add(field);
+  }
+
+  function finishComposition(field: string, commit: () => void) {
+    composingFieldsRef.current.delete(field);
+    commit();
+  }
+
+  function updateTextField(field: TextField, value: string) {
+    if (!composingFieldsRef.current.has(field)) {
+      setField(field, value);
+    }
+  }
+
+  function updateChoiceField(choiceId: string, value: string) {
+    const field = `choice:${choiceId}`;
+    if (!composingFieldsRef.current.has(field)) {
+      updateChoice(choiceId, value);
+    }
+  }
+
+  function updateTagInput(value: string) {
+    if (!composingFieldsRef.current.has("tagInput")) {
+      setTagInput(value);
+    }
+  }
 
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -212,7 +243,11 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
           <input
             type="text"
             value={draft.category}
-            onChange={(event) => setField("category", event.target.value)}
+            onCompositionStart={() => startComposition("category")}
+            onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) =>
+              finishComposition("category", () => setField("category", event.currentTarget.value))
+            }
+            onChange={(event) => updateTextField("category", event.target.value)}
             placeholder="建築計画 / 英単語 / 法規"
           />
           {errors.category ? <small className="field-error">{errors.category}</small> : null}
@@ -223,7 +258,11 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
           <textarea
             rows={4}
             value={draft.questionText}
-            onChange={(event) => setField("questionText", event.target.value)}
+            onCompositionStart={() => startComposition("questionText")}
+            onCompositionEnd={(event: CompositionEvent<HTMLTextAreaElement>) =>
+              finishComposition("questionText", () => setField("questionText", event.currentTarget.value))
+            }
+            onChange={(event) => updateTextField("questionText", event.target.value)}
             placeholder="問題文を入力"
           />
           {errors.questionText ? <small className="field-error">{errors.questionText}</small> : null}
@@ -310,7 +349,11 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
                 type="text"
                 value={choice.label}
                 readOnly={draft.type === "binary"}
-                onChange={(event) => updateChoice(choice.id, event.target.value)}
+                onCompositionStart={() => startComposition(`choice:${choice.id}`)}
+                onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) =>
+                  finishComposition(`choice:${choice.id}`, () => updateChoice(choice.id, event.currentTarget.value))
+                }
+                onChange={(event) => updateChoiceField(choice.id, event.target.value)}
                 placeholder="選択肢を入力"
               />
               {draft.type === "multiple" ? (
@@ -383,7 +426,11 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
           <textarea
             rows={4}
             value={draft.explanation}
-            onChange={(event) => setField("explanation", event.target.value)}
+            onCompositionStart={() => startComposition("explanation")}
+            onCompositionEnd={(event: CompositionEvent<HTMLTextAreaElement>) =>
+              finishComposition("explanation", () => setField("explanation", event.currentTarget.value))
+            }
+            onChange={(event) => updateTextField("explanation", event.target.value)}
             placeholder="解説や補足"
           />
         </label>
@@ -391,13 +438,17 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
         <div className="field">
           <span>タグ</span>
           <div className="tag-input-row">
-            <input
-              type="text"
-              value={tagInput}
-              onChange={(event) => setTagInput(event.target.value)}
+              <input
+                type="text"
+                value={tagInput}
+                onCompositionStart={() => startComposition("tagInput")}
+                onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) =>
+                  finishComposition("tagInput", () => setTagInput(event.currentTarget.value))
+                }
+                onChange={(event) => updateTagInput(event.target.value)}
               placeholder="タグを追加"
               onKeyDown={(event) => {
-                if (event.key === "Enter") {
+                if (event.key === "Enter" && !event.nativeEvent.isComposing) {
                   event.preventDefault();
                   addTag();
                 }
@@ -439,7 +490,16 @@ export function QuestionForm({ mode, initialValue, onSubmit, onSubmitAndExit, on
 
           <label className="field">
             <span>出典</span>
-            <input type="text" value={draft.source} onChange={(event) => setField("source", event.target.value)} placeholder="参考書 / ノート / 講義名" />
+            <input
+              type="text"
+              value={draft.source}
+              onCompositionStart={() => startComposition("source")}
+              onCompositionEnd={(event: CompositionEvent<HTMLInputElement>) =>
+                finishComposition("source", () => setField("source", event.currentTarget.value))
+              }
+              onChange={(event) => updateTextField("source", event.target.value)}
+              placeholder="参考書 / ノート / 講義名"
+            />
           </label>
         </div>
       </section>

@@ -19,7 +19,7 @@ export function useQuestionForm(initialValue?: QuestionDraft) {
 
   function setField<K extends keyof QuestionDraft>(field: K, value: QuestionDraft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
-    setErrors((current) => ({ ...current, [field]: undefined }));
+    setErrors((current) => (current[field] ? { ...current, [field]: undefined } : current));
   }
 
   function setType(type: QuestionType) {
@@ -37,7 +37,7 @@ export function useQuestionForm(initialValue?: QuestionDraft) {
       ...current,
       choices: current.choices.map((choice) => (choice.id === choiceId ? { ...choice, label } : choice))
     }));
-    setErrors((current) => ({ ...current, choices: undefined }));
+    setErrors((current) => (current.choices ? { ...current, choices: undefined } : current));
   }
 
   function setCorrectChoice(choiceId: string) {
