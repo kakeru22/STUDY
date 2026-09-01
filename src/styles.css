@@ -304,6 +304,11 @@ select {
   gap: 1rem;
 }
 
+/* iOS Safari can omit the IME composition highlight inside a blurred form layer. */
+.form-layout {
+  backdrop-filter: none;
+}
+
 .page-shell {
   display: grid;
   gap: 1rem;
